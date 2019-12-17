@@ -9,6 +9,23 @@
     <version>1.0-SNAPSHOT</version>
 
 
+    <repositories>
+        <repository>
+            <id>cloudnet-repo</id>
+            <url>https://cloudnetservice.eu/repositories</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>de.dytanic.cloudnet</groupId>
+            <artifactId>cloudnet-common</artifactId>
+            <version>3.1.0-RELEASE</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+
     <properties>
         <system.version>1.0</system.version>
     </properties>
@@ -48,8 +65,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <source>11</source>
+                    <target>11</target>
                 </configuration>
             </plugin>
         </plugins>
