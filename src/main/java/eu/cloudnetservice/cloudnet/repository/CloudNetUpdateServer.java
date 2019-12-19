@@ -1,6 +1,8 @@
 package eu.cloudnetservice.cloudnet.repository;
 
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
+import de.dytanic.cloudnet.common.logging.*;
+import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
 import eu.cloudnetservice.cloudnet.repository.exception.CloudNetVersionInstallException;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFile;
@@ -10,9 +12,12 @@ import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileL
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
+import org.fusesource.jansi.AnsiConsole;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +41,18 @@ public class CloudNetUpdateServer {
     private final ModuleRepositoryProvider moduleRepositoryProvider;
     private final Javalin webServer;
 
+    private final ILogger logger;
+
     private CloudNetUpdateServer() {
+        this.logger = new DefaultAsyncLogger();
+        this.logger.addLogHandler(new DefaultFileLogHandler(new File("logs"), "cloudnet.repo.log", 8000000L).setFormatter(new DefaultLogFormatter()));
+        this.logger.addLogHandler(new ConsoleLogHandler(System.out, System.err).setFormatter(new DefaultLogFormatter()));
+
+        AnsiConsole.systemInstall();
+
+        System.setOut(new PrintStream(new LogOutputStream(this.logger, LogLevel.INFO), true, StandardCharsets.UTF_8));
+        System.setErr(new PrintStream(new LogOutputStream(this.logger, LogLevel.ERROR), true, StandardCharsets.UTF_8));
+
         this.versionFileLoader = new JenkinsCloudNetVersionFileLoader();
         this.webServer = Javalin.create();
 
@@ -68,6 +84,11 @@ public class CloudNetUpdateServer {
 
     private void stopWithoutShutdown() {
         this.webServer.stop();
+        try {
+            this.logger.close();
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
     }
 
     public void installLatestRelease() throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
