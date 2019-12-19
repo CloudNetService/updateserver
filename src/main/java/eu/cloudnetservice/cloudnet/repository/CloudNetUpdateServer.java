@@ -7,6 +7,9 @@ import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionLoadException;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
+import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
+import io.javalin.Javalin;
+import io.javalin.http.staticfiles.Location;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,12 +29,45 @@ public class CloudNetUpdateServer {
 
     private CloudNetVersionFileLoader versionFileLoader;
 
+    private String currentLatestVersion;
+
+    private boolean apiAvailable = true;
+
+    private final ModuleRepositoryProvider moduleRepositoryProvider;
+    private final Javalin webServer;
+
     private CloudNetUpdateServer() {
         this.versionFileLoader = new JenkinsCloudNetVersionFileLoader();
+        this.webServer = Javalin.create();
+
+        this.moduleRepositoryProvider = new ModuleRepositoryProvider(this.webServer);
+
+        this.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stopWithoutShutdown));
+    }
+
+    public String getCurrentLatestVersion() {
+        return this.currentLatestVersion;
     }
 
     public void start() {
+        this.webServer.config.addStaticFiles("archive", Location.EXTERNAL);
+        this.webServer.config.addStaticFiles("/web");
 
+        webServer.get("/api/status", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
+
+        this.webServer.start(1430);//todo config
+        //todo read latest version from database
+    }
+
+    public void stop() {
+        this.stopWithoutShutdown();
+        System.exit(0);
+    }
+
+    private void stopWithoutShutdown() {
+        this.webServer.stop();
     }
 
     public void installLatestRelease() throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
@@ -55,6 +91,9 @@ public class CloudNetUpdateServer {
         System.out.println("Archiving all CloudNet files for the AutoUpdater...");
         this.archiveFiles(cloudNetVersion, versionFiles);
         System.out.println("Successfully archived all CloudNet files!");
+
+        this.currentLatestVersion = cloudNetVersion;
+        //todo write latest version to database
     }
 
     private void archiveFiles(String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {

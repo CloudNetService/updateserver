@@ -1,5 +1,7 @@
 package eu.cloudnetservice.cloudnet.repository.module;
 
+import java.util.Objects;
+
 public class ModuleId {
 
     private String group;
@@ -33,5 +35,20 @@ public class ModuleId {
         return this.version != null ?
                 this.group + ":" + this.name + ":" + this.version :
                 this.group + ":" + this.name;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ModuleId moduleId = (ModuleId) o;
+        return group.equals(moduleId.group) &&
+                name.equals(moduleId.name) &&
+                Objects.equals(version, moduleId.version);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(group, name, version);
     }
 }
