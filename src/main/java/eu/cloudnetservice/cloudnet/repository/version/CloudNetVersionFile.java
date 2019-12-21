@@ -1,7 +1,12 @@
-package eu.cloudnetservice.cloudnet.repository.loader;
+package eu.cloudnetservice.cloudnet.repository.version;
+
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.net.URL;
 
+@EqualsAndHashCode
+@ToString
 public class CloudNetVersionFile {
 
     private URL downloadURL;

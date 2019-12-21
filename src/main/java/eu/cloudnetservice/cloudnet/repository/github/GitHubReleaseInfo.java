@@ -1,9 +1,13 @@
 package eu.cloudnetservice.cloudnet.repository.github;
 
 import com.google.gson.annotations.SerializedName;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.util.Date;
 
+@EqualsAndHashCode
+@ToString
 public class GitHubReleaseInfo {
 
     private String url;

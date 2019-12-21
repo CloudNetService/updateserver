@@ -1,7 +1,11 @@
 package eu.cloudnetservice.cloudnet.repository.github;
 
 import com.google.gson.annotations.SerializedName;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
+@EqualsAndHashCode
+@ToString
 public class GitHubUserInfo {
 
     private String login;
