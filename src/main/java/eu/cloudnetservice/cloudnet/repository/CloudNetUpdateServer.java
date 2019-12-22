@@ -7,11 +7,15 @@ import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.NitriteDatabase;
+import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
+import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
+import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookAuthenticationHandler;
+import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
 import io.javalin.Javalin;
 import io.javalin.plugin.json.JavalinJson;
 import org.fusesource.jansi.AnsiConsole;
@@ -20,8 +24,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
@@ -36,11 +44,13 @@ public class CloudNetUpdateServer {
 
     private Database database;
 
+    private Collection<UpdatePublisher> updatePublishers = new ArrayList<>();
+
     private BasicConfiguration configuration;
 
     private final ILogger logger;
 
-    private CloudNetUpdateServer() {
+    private CloudNetUpdateServer() throws IOException {
         this.logger = new DefaultAsyncLogger();
         this.logger.addLogHandler(new DefaultFileLogHandler(new File("logs"), "cloudnet.repo.log", 8000000L).setFormatter(new DefaultLogFormatter()));
         this.logger.addLogHandler(new ConsoleLogHandler(System.out, System.err).setFormatter(new DefaultLogFormatter()));
@@ -56,7 +66,7 @@ public class CloudNetUpdateServer {
         this.database = new NitriteDatabase(Paths.get("nitrite.db"));
 
         CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
-        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
+        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/derrop/CloudNet-v3/");
         this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader);
 
         this.webServer = Javalin.create();
@@ -65,24 +75,47 @@ public class CloudNetUpdateServer {
 
         this.start();
 
-        this.installLatestRelease(); //todo debug
-
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopWithoutShutdown));
+    }
+
+    public void registerUpdatePublisher(UpdatePublisher publisher) {
+        this.updatePublishers.add(publisher);
+    }
+
+    public Collection<UpdatePublisher> getUpdatePublishers() {
+        return this.updatePublishers;
     }
 
     public CloudNetVersion getCurrentLatestVersion() {
         return this.database.getLatestVersion();
     }
 
-    public void start() {
+    public Database getDatabase() {
+        return this.database;
+    }
+
+    public void start() throws IOException {
 
         if (!this.database.init()) {
             System.err.println("Failed to initialize the database");
             return;
         }
 
+        for (UpdatePublisher publisher : this.updatePublishers) {
+            Path configPath = Paths.get("publishers", publisher.getName() + ".json");
+            Files.createDirectories(configPath.getParent());
+            publisher.setEnabled(publisher.init(configPath));
+            if (publisher.isEnabled()) {
+                System.out.println("Successfully initialized " + publisher.getName() + " publisher!");
+            } else {
+                System.err.println("Failed to initialize " + publisher.getName() + " publisher!");
+            }
+        }
+
         JavalinJson.setToJsonMapper(JsonDocument.GSON::toJson);
         JavalinJson.setFromJsonMapper(JsonDocument.GSON::fromJson);
+
+        this.webServer.config.requestCacheSize = 16384L;
 
         this.webServer.config.addStaticFiles("/web");
 
@@ -93,6 +126,9 @@ public class CloudNetUpdateServer {
 
         this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
         this.webServer.get("/api/versions/:version", context -> context.json(this.database.getVersion(context.pathParam("version"))));
+
+        this.webServer.before("/github", new GitHubWebHookAuthenticationHandler(this.configuration.getGitHubSecret()));
+        this.webServer.post("/github", new GitHubWebHookReleaseEventHandler(this));
 
         this.webServer.start(this.configuration.getWebPort());
     }
@@ -110,17 +146,39 @@ public class CloudNetUpdateServer {
         } catch (Exception exception) {
             exception.printStackTrace();
         }
+
+        for (UpdatePublisher publisher : this.updatePublishers) {
+            publisher.close();
+        }
     }
 
     public void installLatestRelease() {
         try {
-            this.database.registerVersion(this.releaseArchiver.installLatestRelease());
+            var version = this.releaseArchiver.installLatestRelease();
+            this.database.registerVersion(version);
+            this.invokeReleasePublished(version);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
     }
 
-    public static void main(String[] args) {
+    public void installLatestRelease(GitHubReleaseInfo release) {
+        try {
+            var version = this.releaseArchiver.installLatestRelease(release);
+            this.database.registerVersion(version);
+            this.invokeReleasePublished(version);
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    private void invokeReleasePublished(CloudNetVersion version) {
+        for (UpdatePublisher publisher : this.updatePublishers) {
+            publisher.publishRelease(version);
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
         new CloudNetUpdateServer();
     }
 

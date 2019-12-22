@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -39,12 +40,15 @@ public class ReleaseArchiver {
     }
 
     public CloudNetVersion installLatestRelease() throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
-        var versionFiles = this.versionFileLoader.loadLastVersionFiles();
-
-        GitHubReleaseInfo gitHubRelease = this.loadLatestRelease();
+        var gitHubRelease = this.loadLatestRelease();
         if (gitHubRelease == null) {
             throw new CloudNetVersionInstallException("No github release found!");
         }
+        return this.installLatestRelease(gitHubRelease);
+    }
+
+    public CloudNetVersion installLatestRelease(GitHubReleaseInfo gitHubRelease) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
+        var versionFiles = this.versionFileLoader.loadLastVersionFiles();
 
         var cloudNetVersion = gitHubRelease.getTagName(); //todo load Raw-Version out of cloudnet.jar instead of the tag
 
@@ -58,7 +62,7 @@ public class ReleaseArchiver {
         var releaseCommitUrl = this.findCommitUrl(gitHubRelease.getTagName());
         var releaseCommit = this.loadCommit(releaseCommitUrl);
 
-        return new CloudNetVersion(cloudNetVersion, releaseCommit, new Date(), versionFiles);
+        return new CloudNetVersion(cloudNetVersion, releaseCommit, gitHubRelease, new Date(), versionFiles, new HashMap<>());
     }
 
     private GitHubCommitInfo loadCommit(String url) throws IOException {

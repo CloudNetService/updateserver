@@ -38,7 +38,7 @@ public class ModuleRepositoryProvider {
 
         this.availableModules = new ArrayList<>(); //todo load from database
 
-        this.availableModules.add(
+        this.availableModules.add( //todo debug
                 new RepositoryModuleInfo(
                         new ModuleId(
                                 "eu.cloudnetservice.cloudnet",
