@@ -3,11 +3,12 @@ package eu.cloudnetservice.cloudnet.repository.github;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.io.Serializable;
 import java.util.Date;
 
 @EqualsAndHashCode
 @ToString
-public class GitHubAuthorInfo {
+public class GitHubAuthorInfo implements Serializable {
 
     private String name;
     private String email;

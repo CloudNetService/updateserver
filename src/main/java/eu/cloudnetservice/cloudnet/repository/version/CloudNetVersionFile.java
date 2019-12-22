@@ -3,11 +3,12 @@ package eu.cloudnetservice.cloudnet.repository.version;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.io.Serializable;
 import java.net.URL;
 
 @EqualsAndHashCode
 @ToString
-public class CloudNetVersionFile {
+public class CloudNetVersionFile implements Serializable {
 
     private URL downloadURL;
     private String name;
@@ -32,7 +33,7 @@ public class CloudNetVersionFile {
     }
 
     public enum FileType {
-        CLOUDNET_JAR, CLOUDNET_CNL, MODULE, JAVA_DOCS
+        CLOUDNET_ZIP, CLOUDNET_JAR, CLOUDNET_CNL, MODULE, JAVA_DOCS
     }
 
 }

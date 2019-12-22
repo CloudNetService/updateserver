@@ -4,6 +4,7 @@ import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.Constants;
 import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsArtifact;
 import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsBuild;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -96,6 +97,18 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
                 new URL(lastBuild.getUrl() + "artifact/Javadoc.zip"),
                 "docs",
                 CloudNetVersionFile.FileType.JAVA_DOCS
+        ));
+
+        versionFiles.add(new CloudNetVersionFile(
+                new URL(lastBuild.getUrl() + "artifact/CloudNet.zip"),
+                "CloudNet.zip",
+                CloudNetVersionFile.FileType.CLOUDNET_ZIP
+        ));
+
+        versionFiles.add(new CloudNetVersionFile(
+                new URL(lastBuild.getUrl() + "artifact/cloudnet-launcher/build/libs/launcher.jar"),
+                "launcher.jar",
+                CloudNetVersionFile.FileType.CLOUDNET_JAR
         ));
 
         return versionFiles.toArray(CloudNetVersionFile[]::new);
