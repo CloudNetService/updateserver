@@ -2,6 +2,7 @@ package eu.cloudnetservice.cloudnet.repository.database;
 
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import org.dizitart.no2.*;
+import org.dizitart.no2.filters.Filters;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -37,7 +38,12 @@ public class NitriteDatabase implements Database {
 
     @Override
     public void registerVersion(CloudNetVersion version) {
+        if (Arrays.stream(this.cachedVersions).anyMatch(cloudNetVersion -> cloudNetVersion.getName().equals(version.getName()))) {
+            this.versionsCollection.remove(Filters.eq("name", version.getName()));
+        }
+
         Document document = Document.createDocument("name", version.getName());
+
         document.put("version", version);
 
         this.versionsCollection.insert(document);
