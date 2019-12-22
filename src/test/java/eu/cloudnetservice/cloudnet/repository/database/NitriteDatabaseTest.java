@@ -23,6 +23,7 @@ public class NitriteDatabaseTest {
 
         assertTrue(database.init());
 
+        assertNull(database.getVersion("3.0.0"));
         assertNull(database.getLatestVersion());
         assertEquals(0, database.getAllVersions().length);
 
@@ -55,6 +56,7 @@ public class NitriteDatabaseTest {
 
         database.registerVersion(latestVersion);
 
+        assertEquals(latestVersion, database.getVersion("3.0.0"));
         assertEquals(1, database.getAllVersions().length);
         assertEquals(latestVersion, database.getLatestVersion());
 

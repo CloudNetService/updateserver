@@ -10,6 +10,8 @@ public interface Database extends Closeable {
 
     void registerVersion(CloudNetVersion version);
 
+    CloudNetVersion getVersion(String name);
+
     CloudNetVersion getLatestVersion();
 
     CloudNetVersion[] getAllVersions();

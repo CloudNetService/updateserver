@@ -77,7 +77,7 @@ public class CloudNetUpdateServer {
     public void start() {
 
         if (!this.database.init()) {
-            System.err.println("Failed to initialize nitrite");
+            System.err.println("Failed to initialize the database");
             return;
         }
 
@@ -92,6 +92,7 @@ public class CloudNetUpdateServer {
         this.webServer.get("/api/status", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
 
         this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
+        this.webServer.get("/api/versions/:version", context -> context.json(this.database.getVersion(context.pathParam("version"))));
 
         this.webServer.start(this.configuration.getWebPort());
     }

@@ -52,6 +52,14 @@ public class NitriteDatabase implements Database {
     }
 
     @Override
+    public CloudNetVersion getVersion(String name) {
+        return Arrays.stream(this.cachedVersions)
+                .filter(version -> version.getName().equals(name))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
     public CloudNetVersion getLatestVersion() {
         return this.cachedLatestVersion;
     }
