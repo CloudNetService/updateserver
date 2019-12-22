@@ -20,9 +20,9 @@ public class CloudNetVersion implements Serializable {
     private GitHubReleaseInfo release;
     private Date releaseDate;
     private CloudNetVersionFile[] files;
-    private Map<String, String> properties;
+    private Map<String, Object> properties;
 
-    public CloudNetVersion(String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, Map<String, String> properties) {
+    public CloudNetVersion(String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, Map<String, Object> properties) {
         this.name = name;
         this.commit = commit;
         this.release = release;
@@ -43,6 +43,10 @@ public class CloudNetVersion implements Serializable {
         return this.release;
     }
 
+    public void setRelease(GitHubReleaseInfo release) {
+        this.release = release;
+    }
+
     public Date getReleaseDate() {
         return this.releaseDate;
     }
@@ -51,7 +55,7 @@ public class CloudNetVersion implements Serializable {
         return this.files;
     }
 
-    public Map<String, String> getProperties() {
+    public Map<String, Object> getProperties() {
         return this.properties;
     }
 }

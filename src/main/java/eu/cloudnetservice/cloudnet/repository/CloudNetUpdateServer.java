@@ -5,16 +5,16 @@ import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
 import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
+import eu.cloudnetservice.cloudnet.repository.database.ArangoDatabase;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
-import eu.cloudnetservice.cloudnet.repository.database.NitriteDatabase;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
+import eu.cloudnetservice.cloudnet.repository.publisher.DiscordUpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
-import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookAuthenticationHandler;
 import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
 import io.javalin.Javalin;
 import io.javalin.plugin.json.JavalinJson;
@@ -63,10 +63,10 @@ public class CloudNetUpdateServer {
         this.configuration = new BasicConfiguration();
         this.configuration.load();
 
-        this.database = new NitriteDatabase(Paths.get("nitrite.db"));
+        this.registerUpdatePublisher(new DiscordUpdatePublisher());
 
         CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
-        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/derrop/CloudNet-v3/");
+        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
         this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader);
 
         this.webServer = Javalin.create();
@@ -127,8 +127,7 @@ public class CloudNetUpdateServer {
         this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
         this.webServer.get("/api/versions/:version", context -> context.json(this.database.getVersion(context.pathParam("version"))));
 
-        this.webServer.before("/github", new GitHubWebHookAuthenticationHandler(this.configuration.getGitHubSecret()));
-        this.webServer.post("/github", new GitHubWebHookReleaseEventHandler(this));
+        this.webServer.post("/github", new GitHubWebHookReleaseEventHandler(this.configuration.getGitHubSecret(), this));
 
         this.webServer.start(this.configuration.getWebPort());
     }
@@ -155,8 +154,8 @@ public class CloudNetUpdateServer {
     public void installLatestRelease() {
         try {
             var version = this.releaseArchiver.installLatestRelease();
-            this.database.registerVersion(version);
             this.invokeReleasePublished(version);
+            this.database.registerVersion(version);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
@@ -165,8 +164,8 @@ public class CloudNetUpdateServer {
     public void installLatestRelease(GitHubReleaseInfo release) {
         try {
             var version = this.releaseArchiver.installLatestRelease(release);
-            this.database.registerVersion(version);
             this.invokeReleasePublished(version);
+            this.database.registerVersion(version);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
