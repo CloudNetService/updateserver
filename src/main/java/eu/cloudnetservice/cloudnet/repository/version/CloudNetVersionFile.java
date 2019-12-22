@@ -10,7 +10,7 @@ import java.net.URL;
 @ToString
 public class CloudNetVersionFile implements Serializable {
 
-    private URL downloadURL;
+    private transient URL downloadURL;
     private String name;
     private FileType fileType;
 
