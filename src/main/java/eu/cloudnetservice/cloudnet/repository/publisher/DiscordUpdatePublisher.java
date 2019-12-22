@@ -14,12 +14,10 @@ import javax.security.auth.login.LoginException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 public class DiscordUpdatePublisher implements UpdatePublisher {
 
@@ -97,14 +95,14 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     public void publishRelease(CloudNetVersion version) {
         Collection<String> messages = DiscordMessageSplitter.splitMessage(version.getRelease().getBody());
 
-        Collection<Long> messageIds = new ArrayList<>();
+        Collection<String> messageIds = new ArrayList<>();
         ITask<Void> task = new ListenableTask<>(() -> {
-            version.getProperties().put(PROPERTIES_KEY_MESSAGES, messageIds.toArray(Long[]::new));
+            version.getProperties().put(PROPERTIES_KEY_MESSAGES, messageIds.toArray(String[]::new));
             return null;
         });
 
         Iterator<String> messageIterator = messages.iterator();
-        this.sendMessages(this.updatesChannel, message -> messageIds.add(message.getIdLong()), () -> {
+        this.sendMessages(this.updatesChannel, message -> messageIds.add(message.getId()), () -> {
             try {
                 task.call();
             } catch (Exception exception) {
@@ -132,10 +130,10 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
 
     @Override
     public void updateRelease(CloudNetVersion version) {
-        Long[] messageIds = (Long[]) version.getProperties().get(PROPERTIES_KEY_MESSAGES);
-        if (messageIds == null) {
+        if (!version.getProperties().containsKey(PROPERTIES_KEY_MESSAGES)) {
             return;
         }
+        String[] messageIds = ((Collection<String>) version.getProperties().get(PROPERTIES_KEY_MESSAGES)).toArray(String[]::new);
         Collection<String> newMessages = DiscordMessageSplitter.splitMessage(version.getRelease().getBody());
         if (newMessages.size() > messageIds.length) {
             System.err.println("Cannot update description because we cannot add more messages than we have!");
@@ -143,7 +141,7 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
         }
         String[] messages = newMessages.toArray(String[]::new);
         for (int i = 0; i < messageIds.length; i++) {
-            long messageId = messageIds[i];
+            String messageId = messageIds[i];
             if (messages.length > i) {
                 String message = messages[i];
                 this.updatesChannel.editMessageById(messageId, message).queue();
@@ -155,13 +153,17 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
 
     @Override
     public void deleteRelease(CloudNetVersion version) {
-        Long[] messageIds = (Long[]) version.getProperties().get(PROPERTIES_KEY_MESSAGES);
-        if (messageIds == null) {
+        if (!version.getProperties().containsKey(PROPERTIES_KEY_MESSAGES)) {
             return;
         }
-        this.updatesChannel.deleteMessagesByIds(
-                Arrays.stream(messageIds).map(messageId -> Long.toString(messageId)).collect(Collectors.toList())
-        ).queue();
+        Collection<String> messageIds = ((Collection<String>) version.getProperties().get(PROPERTIES_KEY_MESSAGES));
+        if (messageIds.size() > 1) {
+            this.updatesChannel.deleteMessagesByIds(messageIds).queue();
+        } else {
+            for (String messageId : messageIds) {
+                this.updatesChannel.deleteMessageById(messageId).queue();
+            }
+        }
         version.getProperties().remove(PROPERTIES_KEY_MESSAGES);
     }
 

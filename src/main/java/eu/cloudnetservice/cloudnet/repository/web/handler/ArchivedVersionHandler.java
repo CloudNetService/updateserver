@@ -8,7 +8,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 public class ArchivedVersionHandler implements Handler {
 

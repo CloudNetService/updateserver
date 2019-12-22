@@ -4,11 +4,9 @@ import com.google.gson.annotations.SerializedName;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import java.io.Serializable;
-
 @EqualsAndHashCode
 @ToString
-public class GitHubCommitInfo implements Serializable {
+public class GitHubCommitInfo {
 
     private GitHubAuthorInfo author;
     private GitHubAuthorInfo committer;

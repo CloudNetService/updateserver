@@ -5,8 +5,8 @@ import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
 import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
-import eu.cloudnetservice.cloudnet.repository.database.ArangoDatabase;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
+import eu.cloudnetservice.cloudnet.repository.database.H2Database;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
@@ -62,6 +62,8 @@ public class CloudNetUpdateServer {
 
         this.configuration = new BasicConfiguration();
         this.configuration.load();
+
+        this.database = new H2Database(Paths.get("database"));
 
         this.registerUpdatePublisher(new DiscordUpdatePublisher());
 

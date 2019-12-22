@@ -2,7 +2,6 @@ package eu.cloudnetservice.cloudnet.repository.module;
 
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import io.javalin.Javalin;
-import io.javalin.plugin.rendering.vue.VueComponent;
 
 import java.util.ArrayList;
 import java.util.Collection;

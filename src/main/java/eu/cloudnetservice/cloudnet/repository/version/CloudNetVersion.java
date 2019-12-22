@@ -1,19 +1,16 @@
 package eu.cloudnetservice.cloudnet.repository.version;
 
-import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubCommitInfo;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import java.io.Serializable;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 
 @EqualsAndHashCode
 @ToString
-public class CloudNetVersion implements Serializable {
+public class CloudNetVersion {
 
     private String name;
     private GitHubCommitInfo commit;

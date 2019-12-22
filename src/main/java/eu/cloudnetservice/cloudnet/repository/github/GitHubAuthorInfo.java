@@ -1,14 +1,9 @@
 package eu.cloudnetservice.cloudnet.repository.github;
 
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
-
-import java.io.Serializable;
 import java.util.Date;
+import java.util.Objects;
 
-@EqualsAndHashCode
-@ToString
-public class GitHubAuthorInfo implements Serializable {
+public class GitHubAuthorInfo {
 
     private String name;
     private String email;
@@ -30,5 +25,20 @@ public class GitHubAuthorInfo implements Serializable {
 
     public String getName() {
         return this.name;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GitHubAuthorInfo that = (GitHubAuthorInfo) o;
+        return Objects.equals(name, that.name) &&
+                Objects.equals(email, that.email) &&
+                Objects.equals(date, that.date);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, email, date);
     }
 }

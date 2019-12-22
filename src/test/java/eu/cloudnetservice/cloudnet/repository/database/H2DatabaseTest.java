@@ -15,12 +15,12 @@ import java.util.HashMap;
 
 import static org.junit.Assert.*;
 
-public class NitriteDatabaseTest {
+public class H2DatabaseTest {
 
     @Test
-    public void testNitriteDatabase() throws IOException {
+    public void testH2Database() throws IOException {
         Files.deleteIfExists(Paths.get("target", "h2database.db"));
-        Database database = new NitriteDatabase(Paths.get("target", "h2database.db"));
+        Database database = new H2Database(Paths.get("target", "h2"));
 
         assertTrue(database.init());
 
@@ -70,7 +70,7 @@ public class NitriteDatabaseTest {
                                 "test@test",
                                 new Date()
                         ),
-                        "Release 3.0.0",
+                        "Release 3.1.0",
                         "https://api.github.com/repos/CloudNetService/CloudNet-v3/git/commits/TEST",
                         0
                 ),
@@ -86,6 +86,7 @@ public class NitriteDatabaseTest {
                 new HashMap<>()
         );
 
+        System.out.println(oldVersion.getReleaseDate().getTime());
         database.registerVersion(oldVersion);
 
         assertEquals(oldVersion, database.getLatestVersion());
@@ -97,6 +98,7 @@ public class NitriteDatabaseTest {
         assertEquals(oldVersion, database.getVersion("3.0.0"));
         assertEquals(latestVersion, database.getVersion("3.1.0"));
         assertEquals(2, database.getAllVersions().length);
+        assertNotEquals(oldVersion, database.getLatestVersion());
         assertEquals(latestVersion, database.getLatestVersion());
 
         database.close();
