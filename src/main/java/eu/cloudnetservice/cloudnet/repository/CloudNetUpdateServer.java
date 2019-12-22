@@ -22,6 +22,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
 
@@ -64,7 +65,7 @@ public class CloudNetUpdateServer {
 
         this.start();
 
-        this.installLatestRelease();
+        this.installLatestRelease(); //todo debug
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopWithoutShutdown));
     }
@@ -90,7 +91,7 @@ public class CloudNetUpdateServer {
 
         this.webServer.get("/api/status", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
 
-        this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName)).toPrettyJson()));
+        this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
 
         this.webServer.start(this.configuration.getWebPort());
     }
