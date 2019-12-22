@@ -3,6 +3,7 @@ package eu.cloudnetservice.cloudnet.repository;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
+import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.NitriteDatabase;
@@ -25,10 +26,6 @@ import java.util.Arrays;
 public class CloudNetUpdateServer {
 
 
-    private String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
-
-    private CloudNetVersionFileLoader versionFileLoader;
-
     private boolean apiAvailable = true;
 
     private ReleaseArchiver releaseArchiver;
@@ -38,8 +35,9 @@ public class CloudNetUpdateServer {
 
     private Database database;
 
-    private final ILogger logger;
+    private BasicConfiguration configuration;
 
+    private final ILogger logger;
 
     private CloudNetUpdateServer() {
         this.logger = new DefaultAsyncLogger();
@@ -51,10 +49,14 @@ public class CloudNetUpdateServer {
         System.setOut(new PrintStream(new LogOutputStream(this.logger, LogLevel.INFO), true, StandardCharsets.UTF_8));
         System.setErr(new PrintStream(new LogOutputStream(this.logger, LogLevel.ERROR), true, StandardCharsets.UTF_8));
 
+        this.configuration = new BasicConfiguration();
+        this.configuration.load();
+
         this.database = new NitriteDatabase(Paths.get("nitrite.db"));
 
-        this.versionFileLoader = new JenkinsCloudNetVersionFileLoader();
-        this.releaseArchiver = new ReleaseArchiver(this.gitHubApiBaseUrl, this.versionFileLoader);
+        CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
+        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
+        this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader);
 
         this.webServer = Javalin.create();
 
@@ -90,7 +92,7 @@ public class CloudNetUpdateServer {
 
         this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName)).toPrettyJson()));
 
-        this.webServer.start(1430);//todo config
+        this.webServer.start(this.configuration.getWebPort());
     }
 
     public void stop() {
