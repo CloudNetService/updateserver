@@ -17,6 +17,7 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
 import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
 import io.javalin.Javalin;
+import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.plugin.json.JavalinJson;
 import org.fusesource.jansi.AnsiConsole;
 
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 public class CloudNetUpdateServer {
 
 
-    private boolean apiAvailable = true;
+    private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
 
     private ReleaseArchiver releaseArchiver;
 
@@ -124,8 +125,13 @@ public class CloudNetUpdateServer {
         this.webServer.get("/versions/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY, "CloudNet.zip", this));
         this.webServer.get("/docs/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY, "index.html", this));
 
-        this.webServer.get("/api/status", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
+        this.webServer.get("/api", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
 
+        this.webServer.before("/api/*", context -> {
+            if (!this.apiAvailable && !context.path().equalsIgnoreCase("/api/")) {
+                throw new InternalServerErrorResponse("API currently not available");
+            }
+        });
         this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
         this.webServer.get("/api/versions/:version", context -> context.json(this.database.getVersion(context.pathParam("version"))));
 
