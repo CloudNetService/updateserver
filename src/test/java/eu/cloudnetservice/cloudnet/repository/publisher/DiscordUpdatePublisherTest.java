@@ -1,5 +1,6 @@
 package eu.cloudnetservice.cloudnet.repository.publisher;
 
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordMessageSplitter;
 import org.junit.Test;
 
 import java.util.Collection;

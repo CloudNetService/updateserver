@@ -1,5 +1,6 @@
 package eu.cloudnetservice.cloudnet.repository.publisher;
 
+import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 
 import java.nio.file.Path;
@@ -12,7 +13,7 @@ public interface UpdatePublisher {
 
     void setEnabled(boolean enabled);
 
-    boolean init(Path configPath);
+    boolean init(CloudNetUpdateServer updateServer, Path configPath);
 
     void close();
 

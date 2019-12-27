@@ -11,7 +11,7 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
-import eu.cloudnetservice.cloudnet.repository.publisher.DiscordUpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
@@ -107,7 +107,7 @@ public class CloudNetUpdateServer {
         for (UpdatePublisher publisher : this.updatePublishers) {
             Path configPath = Paths.get("publishers", publisher.getName() + ".json");
             Files.createDirectories(configPath.getParent());
-            publisher.setEnabled(publisher.init(configPath));
+            publisher.setEnabled(publisher.init(this, configPath));
             if (publisher.isEnabled()) {
                 System.out.println("Successfully initialized " + publisher.getName() + " publisher!");
             } else {

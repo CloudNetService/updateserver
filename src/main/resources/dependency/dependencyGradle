@@ -1,0 +1,2 @@
+```groovy
+compileOnly group: %groupId%, name: %artifactId%, version: %version%```

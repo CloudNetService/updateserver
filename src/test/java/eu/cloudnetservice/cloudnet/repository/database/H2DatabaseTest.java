@@ -4,6 +4,7 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubAuthorInfo;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubCommitInfo;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
+import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -19,7 +20,7 @@ public class H2DatabaseTest {
 
     @Test
     public void testH2Database() throws IOException {
-        Files.deleteIfExists(Paths.get("target", "h2database.db"));
+        Files.deleteIfExists(Paths.get("target", "h2.mv.db"));
         Database database = new H2Database(Paths.get("target", "h2"));
 
         assertTrue(database.init());
@@ -51,7 +52,12 @@ public class H2DatabaseTest {
                         new CloudNetVersionFile(
                                 new URL("https://null.null"),
                                 "launcher.jar",
-                                CloudNetVersionFile.FileType.CLOUDNET_JAR
+                                CloudNetVersionFile.FileType.CLOUDNET_JAR,
+                                new MavenVersionInfo(
+                                        "https://cloudnetservice.eu/repositories",
+                                        "de.dytanic.cloudnet",
+                                        "cloudnet-TARGET"
+                                )
                         )
                 },
                 new HashMap<>()
@@ -80,13 +86,17 @@ public class H2DatabaseTest {
                         new CloudNetVersionFile(
                                 new URL("https://null.null"),
                                 "launcher.jar",
-                                CloudNetVersionFile.FileType.CLOUDNET_JAR
+                                CloudNetVersionFile.FileType.CLOUDNET_JAR,
+                                new MavenVersionInfo(
+                                        "https://cloudnetservice.eu/repositories",
+                                        "de.dytanic.cloudnet",
+                                        "cloudnet-TARGET"
+                                )
                         )
                 },
                 new HashMap<>()
         );
 
-        System.out.println(oldVersion.getReleaseDate().getTime());
         database.registerVersion(oldVersion);
 
         assertEquals(oldVersion, database.getLatestVersion());

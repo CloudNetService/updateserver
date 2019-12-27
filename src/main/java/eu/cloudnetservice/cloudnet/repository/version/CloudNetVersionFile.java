@@ -13,11 +13,13 @@ public class CloudNetVersionFile implements Serializable {
     private transient URL downloadURL;
     private String name;
     private FileType fileType;
+    private MavenVersionInfo versionInfo;
 
-    public CloudNetVersionFile(URL downloadURL, String name, FileType fileType) {
+    public CloudNetVersionFile(URL downloadURL, String name, FileType fileType, MavenVersionInfo versionInfo) {
         this.downloadURL = downloadURL;
         this.name = name;
         this.fileType = fileType;
+        this.versionInfo = versionInfo;
     }
 
     public URL getDownloadURL() {
@@ -30,6 +32,10 @@ public class CloudNetVersionFile implements Serializable {
 
     public FileType getFileType() {
         return this.fileType;
+    }
+
+    public MavenVersionInfo getVersionInfo() {
+        return this.versionInfo;
     }
 
     public enum FileType {

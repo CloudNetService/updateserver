@@ -1,8 +1,14 @@
-package eu.cloudnetservice.cloudnet.repository.publisher;
+package eu.cloudnetservice.cloudnet.repository.publisher.discord;
 
+import com.google.gson.reflect.TypeToken;
 import de.dytanic.cloudnet.common.concurrent.ITask;
 import de.dytanic.cloudnet.common.concurrent.ListenableTask;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
+import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordCommandMap;
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordPermissionState;
+import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.defaults.DiscordCommandDependency;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -16,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
@@ -26,10 +33,25 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     private boolean enabled = false;
 
     private JDA jda;
+    private DiscordCommandMap commandMap;
 
     private String token;
+    private String commandPrefix;
+    private Map<DiscordPermissionState, String> permissionStateRoles;
     private long updatesChannelId;
     private TextChannel updatesChannel;
+
+    public JDA getJda() {
+        return this.jda;
+    }
+
+    public Map<DiscordPermissionState, String> getPermissionStateRoles() {
+        return this.permissionStateRoles;
+    }
+
+    public String getCommandPrefix() {
+        return this.commandPrefix;
+    }
 
     @Override
     public String getName() {
@@ -51,6 +73,12 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
         JsonDocument configDocument = exists ? JsonDocument.newDocument(configPath) : JsonDocument.newDocument();
         this.token = configDocument.getString("token", "");
         this.updatesChannelId = configDocument.getLong("updatesChannelId", 0L);
+        this.commandPrefix = configDocument.getString("commandPrefix", "!");
+        this.permissionStateRoles = configDocument.get(
+                "permissionStateRoles",
+                TypeToken.getParameterized(Map.class, DiscordPermissionState.class, String.class).getType(),
+                DiscordPermissionState.getDefaultMappings()
+        );
 
         if (!exists) {
             configDocument.write(configPath);
@@ -58,7 +86,7 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     }
 
     @Override
-    public boolean init(Path configPath) {
+    public boolean init(CloudNetUpdateServer updateServer, Path configPath) {
         this.readConfig(configPath);
 
         if (this.token == null || this.token.isEmpty() || this.updatesChannelId <= 0) {
@@ -76,6 +104,22 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
                 this.jda.shutdown();
                 return false;
             }
+
+            this.commandMap = new DiscordCommandMap(this, updateServer);
+            this.commandMap.init(this.jda);
+            this.commandMap.setCommandPrefix(this.commandPrefix);
+
+            this.commandMap.registerCommand(new DiscordCommandDependency(
+                    "dependency/dependencyMaven",
+                    "dependency/repositoryMaven",
+                    "maven",
+                    "mvn"
+            ));
+            this.commandMap.registerCommand(new DiscordCommandDependency(
+                    "dependency/dependencyGradle",
+                    "dependency/repositoryGradle",
+                    "gradle"
+            ));
 
             return true;
         } catch (InterruptedException | LoginException exception) {
