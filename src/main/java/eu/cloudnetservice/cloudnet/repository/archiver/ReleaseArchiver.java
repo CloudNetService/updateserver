@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import de.dytanic.cloudnet.common.io.FileUtils;
 import eu.cloudnetservice.cloudnet.repository.Constants;
+import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.exception.CloudNetVersionInstallException;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubCommitInfo;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
@@ -13,6 +14,7 @@ import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionLoadException;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
+import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,10 +35,12 @@ public class ReleaseArchiver {
 
     private String gitHubApiBaseUrl;
     private CloudNetVersionFileLoader versionFileLoader;
+    private VersionFileMappings versionFileMappings;
 
-    public ReleaseArchiver(String gitHubApiBaseUrl, CloudNetVersionFileLoader versionFileLoader) {
+    public ReleaseArchiver(String gitHubApiBaseUrl, CloudNetVersionFileLoader versionFileLoader, VersionFileMappings versionFileMappings) {
         this.gitHubApiBaseUrl = gitHubApiBaseUrl;
         this.versionFileLoader = versionFileLoader;
+        this.versionFileMappings = versionFileMappings;
     }
 
     public CloudNetVersion installLatestRelease() throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
@@ -48,7 +52,7 @@ public class ReleaseArchiver {
     }
 
     public CloudNetVersion installLatestRelease(GitHubReleaseInfo gitHubRelease) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
-        var versionFiles = this.versionFileLoader.loadLastVersionFiles();
+        var versionFiles = this.versionFileLoader.loadLastVersionFiles(this.versionFileMappings);
 
         var cloudNetVersion = gitHubRelease.getTagName(); //todo load Raw-Version out of cloudnet.jar instead of the tag
 

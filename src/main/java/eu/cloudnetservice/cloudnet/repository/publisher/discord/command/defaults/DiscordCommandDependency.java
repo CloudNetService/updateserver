@@ -65,15 +65,16 @@ public class DiscordCommandDependency extends DiscordCommand {
 
         builder.setTitle("**Maven Dependencies for Version " + version.getName() + "**");
         builder.setDescription(
-                this.dependencyFormat
-                        .replace("%groupId%", generalGroup != null ? generalGroup : "cloudnet-group")
-                        .replace("%artifactId%", "cloudnet-artifact")
-                        .replace("%version%", version.getName())
-                        + "\n" +
+                "Basic dependency:\n" +
+                        this.dependencyFormat
+                                .replace("%groupId%", generalGroup != null ? generalGroup : "cloudnet-group")
+                                .replace("%artifactId%", "cloudnet-artifact")
+                                .replace("%version%", version.getName())
+                        + "\nRepository:" +
                         this.repositoryFormat.replace("%url%", firstVersionInfo.getRepositoryUrl())
         );
 
-        builder.addField("You have to replace:",
+        builder.addField("**You have to replace:**",
                 generalGroup != null ?
                         "cloudnet-artifact" :
                         "cloudnet-group and cloudnet-artifact",
@@ -81,10 +82,15 @@ public class DiscordCommandDependency extends DiscordCommand {
         );
 
         for (MavenVersionInfo versionInfo : versionInfos) {
+            String artifact = versionInfo.getArtifactId();
+            String artifactTarget = super.getServer().getConfiguration().getVersionFileMappings().getVersionTarget(artifact);
+            if (artifactTarget != null) {
+                artifact += " | " + artifactTarget;
+            }
             if (generalGroup != null) {
-                builder.addField("", versionInfo.getArtifactId(), true);
+                builder.addField("", artifact, true);
             } else {
-                builder.addField(versionInfo.getGroupId(), versionInfo.getArtifactId(), true);
+                builder.addField(versionInfo.getGroupId(), artifact, true);
             }
         }
 

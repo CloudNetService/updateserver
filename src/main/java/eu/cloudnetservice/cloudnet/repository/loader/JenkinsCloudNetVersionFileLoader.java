@@ -6,6 +6,7 @@ import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsArtifact;
 import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsBuild;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
+import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,10 +24,9 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
     private String jenkinsJobURL = System.getProperty("cloudnet.repository.versions.source.jenkins", "https://ci.cloudnetservice.eu/job/CloudNetService/job/CloudNet-v3/job/master/");
     private String mavenRepositoryURL = System.getProperty("cloudnet.repository.maven.url", "https://cloudnetservice.eu/repositories");
     private String cloudNetMavenGroup = System.getProperty("cloudnet.repository.maven.dependency.groupId", "de.dytanic.cloudnet");
-    private Map<String, String> artifactMappings = new HashMap<>();
 
     @Override
-    public CloudNetVersionFile[] loadLastVersionFiles() throws IOException {
+    public CloudNetVersionFile[] loadLastVersionFiles(VersionFileMappings versionFileMappings) throws IOException {
         var masterStatus = JsonDocument.newDocument();
         this.loadJson(masterStatus, new URL(this.jenkinsJobURL + "api/json/"));
 
@@ -100,7 +100,7 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
                         MavenVersionInfo versionInfo = artifactId != null ? new MavenVersionInfo(
                                 this.mavenRepositoryURL,
                                 this.cloudNetMavenGroup,
-                                artifactId
+                                versionFileMappings.getVersionName(artifactId)
                         ) : null;
 
                         return new CloudNetVersionFile(path.toUri().toURL(), path.getFileName().toString(), fileType, versionInfo);

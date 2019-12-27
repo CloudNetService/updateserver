@@ -1,6 +1,7 @@
 package eu.cloudnetservice.cloudnet.repository.loader;
 
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
+import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,7 +13,7 @@ import java.util.zip.ZipInputStream;
 public interface CloudNetVersionFileLoader {
 
     // Loads all available version files (cloudnet.jar, driver.jar, cloudnet.cnl, driver.cnl and all modules) from the source (e.g. Jenkins)
-    CloudNetVersionFile[] loadLastVersionFiles() throws IOException, CloudNetVersionLoadException;
+    CloudNetVersionFile[] loadLastVersionFiles(VersionFileMappings versionFileMappings) throws IOException, CloudNetVersionLoadException;
 
 
     default boolean isCloudNetModule(Path path) {

@@ -11,8 +11,8 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
 import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
@@ -43,12 +43,10 @@ public class CloudNetUpdateServer {
     private final ModuleRepositoryProvider moduleRepositoryProvider;
     private final Javalin webServer;
 
-    private Database database;
-
     private Collection<UpdatePublisher> updatePublishers = new ArrayList<>();
 
+    private Database database;
     private BasicConfiguration configuration;
-
     private final ILogger logger;
 
     private CloudNetUpdateServer() throws IOException {
@@ -70,7 +68,7 @@ public class CloudNetUpdateServer {
 
         CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
         String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
-        this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader);
+        this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader, this.configuration.getVersionFileMappings());
 
         this.webServer = Javalin.create();
 
@@ -95,6 +93,10 @@ public class CloudNetUpdateServer {
 
     public Database getDatabase() {
         return this.database;
+    }
+
+    public BasicConfiguration getConfiguration() {
+        return this.configuration;
     }
 
     public void start() throws IOException {
