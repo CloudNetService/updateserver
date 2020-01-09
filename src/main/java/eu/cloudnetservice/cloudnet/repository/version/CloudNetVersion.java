@@ -17,14 +17,16 @@ public class CloudNetVersion {
     private GitHubReleaseInfo release;
     private Date releaseDate;
     private CloudNetVersionFile[] files;
+    private VersionFileMappings versionFileMappings;
     private Map<String, Object> properties;
 
-    public CloudNetVersion(String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, Map<String, Object> properties) {
+    public CloudNetVersion(String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, VersionFileMappings versionFileMappings, Map<String, Object> properties) {
         this.name = name;
         this.commit = commit;
         this.release = release;
         this.releaseDate = releaseDate;
         this.files = files;
+        this.versionFileMappings = versionFileMappings;
         this.properties = properties;
     }
 
@@ -50,6 +52,10 @@ public class CloudNetVersion {
 
     public CloudNetVersionFile[] getFiles() {
         return this.files;
+    }
+
+    public VersionFileMappings getVersionFileMappings() {
+        return this.versionFileMappings;
     }
 
     public Map<String, Object> getProperties() {

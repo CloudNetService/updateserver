@@ -5,6 +5,7 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubCommitInfo;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
+import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -60,6 +61,7 @@ public class H2DatabaseTest {
                                 )
                         )
                 },
+                new VersionFileMappings(),
                 new HashMap<>()
         );
 
@@ -94,6 +96,7 @@ public class H2DatabaseTest {
                                 )
                         )
                 },
+                new VersionFileMappings(),
                 new HashMap<>()
         );
 

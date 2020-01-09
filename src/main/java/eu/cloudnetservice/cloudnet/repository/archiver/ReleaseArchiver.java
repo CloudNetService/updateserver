@@ -66,7 +66,7 @@ public class ReleaseArchiver {
         var releaseCommitUrl = this.findCommitUrl(gitHubRelease.getTagName());
         var releaseCommit = this.loadCommit(releaseCommitUrl);
 
-        return new CloudNetVersion(cloudNetVersion, releaseCommit, gitHubRelease, new Date(), versionFiles, new HashMap<>());
+        return new CloudNetVersion(cloudNetVersion, releaseCommit, gitHubRelease, new Date(), versionFiles, this.versionFileMappings, new HashMap<>());
     }
 
     private GitHubCommitInfo loadCommit(String url) throws IOException {

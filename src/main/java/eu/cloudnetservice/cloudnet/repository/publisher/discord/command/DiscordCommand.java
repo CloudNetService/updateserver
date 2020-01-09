@@ -10,11 +10,12 @@ import java.util.Arrays;
 
 public abstract class DiscordCommand {
 
-    private CloudNetUpdateServer updateServer;
     private String[] names;
     private DiscordPermissionState[] allowedRoles;
 
+    private CloudNetUpdateServer updateServer;
     private DiscordUpdatePublisher updatePublisher;
+    private DiscordCommandMap commandMap;
 
     public DiscordCommand(String[] names, DiscordPermissionState[] allowedRoles) {
         this.names = names;
@@ -37,12 +38,20 @@ public abstract class DiscordCommand {
         return this.updateServer;
     }
 
+    public DiscordCommandMap getCommandMap() {
+        return this.commandMap;
+    }
+
     public void setUpdateServer(CloudNetUpdateServer updateServer) {
         this.updateServer = updateServer;
     }
 
     public void setUpdatePublisher(DiscordUpdatePublisher updatePublisher) {
         this.updatePublisher = updatePublisher;
+    }
+
+    public void setCommandMap(DiscordCommandMap commandMap) {
+        this.commandMap = commandMap;
     }
 
     public boolean canExecute(Member member) {

@@ -49,6 +49,7 @@ public class DiscordCommandMap {
 
         command.setUpdatePublisher(this.updatePublisher);
         command.setUpdateServer(this.updateServer);
+        command.setCommandMap(this);
     }
 
     public DiscordCommand getCommand(String line) {

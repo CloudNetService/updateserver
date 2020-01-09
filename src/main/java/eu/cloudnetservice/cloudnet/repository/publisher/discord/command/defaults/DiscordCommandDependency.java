@@ -6,6 +6,7 @@ import eu.cloudnetservice.cloudnet.repository.util.StringUtils;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
+import eu.cloudnetservice.cloudnet.repository.version.VersionEnvironment;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
@@ -31,17 +32,7 @@ public class DiscordCommandDependency extends DiscordCommand {
 
     @Override
     public void execute(Member sender, MessageChannel channel, Message message, String[] args) {
-        CloudNetVersion version = null;
-        if (args.length > 0) {
-            version = super.getServer().getDatabase().getVersion(args[0]);
-        }
-
-        if (version == null) {
-            version = super.getServer().getCurrentLatestVersion();
-            if (args.length > 0) {
-                channel.sendMessage("That version doesn't exist!").queue();
-            }
-        }
+        CloudNetVersion version = super.getServer().getCurrentLatestVersion();
 
         if (version == null) {
             channel.sendMessage("There is currently no version available!").queue();
@@ -57,11 +48,63 @@ public class DiscordCommandDependency extends DiscordCommand {
             channel.sendMessage("No dependency for that version found!").queue();
             return;
         }
-        MavenVersionInfo firstVersionInfo = versionInfos.iterator().next();
-        String generalGroup = versionInfos.stream().allMatch(mavenVersionInfo -> firstVersionInfo.getGroupId().equals(mavenVersionInfo.getGroupId())) ?
-                firstVersionInfo.getGroupId() : null;
+
+        if (args.length == 1) {
+            VersionEnvironment environment;
+            try {
+                environment = VersionEnvironment.valueOf(args[0].toUpperCase());
+            } catch (Exception ignored) {
+                channel.sendMessage("That environment doesn't exist!").queue();
+                return;
+            }
+
+            Collection<String> supportedDependencies = version.getVersionFileMappings().getSupportedDependencies(environment);
+
+            MavenVersionInfo firstVersionInfo = versionInfos.iterator().next();
+
+            EmbedBuilder builder = new EmbedBuilder();
+
+            builder.setTitle("**Dependencies that can be used on " + environment + " of Version " + version.getName() + "**");
+
+            builder.setDescription("Repository:\n" +
+                    this.repositoryFormat.replace("%url%", firstVersionInfo.getRepositoryUrl()));
+
+            for (MavenVersionInfo versionInfo : versionInfos) {
+                String artifact = versionInfo.getArtifactId();
+
+                if (!supportedDependencies.contains(artifact)) {
+                    continue;
+                }
+
+                builder.addField(artifact,
+                        this.dependencyFormat
+                                .replace("%groupId%", versionInfo.getGroupId())
+                                .replace("%artifactId%", artifact)
+                                .replace("%version%", version.getName()),
+                        true
+                );
+            }
+
+            channel.sendMessage(builder.build()).queue();
+
+            return;
+        }
 
         EmbedBuilder builder = new EmbedBuilder();
+
+        builder.setTitle("**Dependencies for CloudNet " + version.getName() + "**");
+
+        builder.setDescription("Use " + super.getCommandMap().getCommandPrefix() + super.getNames()[0] + " <" + Arrays.toString(VersionEnvironment.values()) + "> " +
+                "to get all dependencies that can be used for a specific environment"
+        );
+
+        for (MavenVersionInfo versionInfo : versionInfos) {
+            builder.addField("", versionInfo.getArtifactId(), true);
+        }
+
+        channel.sendMessage(builder.build()).queue();
+
+        /*EmbedBuilder builder = new EmbedBuilder();
 
         builder.setTitle("**Maven Dependencies for Version " + version.getName() + "**");
         builder.setDescription(
@@ -70,7 +113,7 @@ public class DiscordCommandDependency extends DiscordCommand {
                                 .replace("%groupId%", generalGroup != null ? generalGroup : "cloudnet-group")
                                 .replace("%artifactId%", "cloudnet-artifact")
                                 .replace("%version%", version.getName())
-                        + "\nRepository:" +
+                        + "\nRepository:\n" +
                         this.repositoryFormat.replace("%url%", firstVersionInfo.getRepositoryUrl())
         );
 
@@ -94,6 +137,6 @@ public class DiscordCommandDependency extends DiscordCommand {
             }
         }
 
-        channel.sendMessage(builder.build()).queue();
+        channel.sendMessage(builder.build()).queue();*/
     }
 }
