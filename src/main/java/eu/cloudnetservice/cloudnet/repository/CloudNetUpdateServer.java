@@ -1,6 +1,5 @@
 package eu.cloudnetservice.cloudnet.repository;
 
-import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
 import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
@@ -11,14 +10,12 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
-import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.endpoint.EndPoint;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
-import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
-import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
+import eu.cloudnetservice.cloudnet.repository.web.WebServer;
 import io.javalin.Javalin;
-import io.javalin.http.InternalServerErrorResponse;
-import io.javalin.plugin.json.JavalinJson;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.File;
@@ -29,21 +26,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
 
-
-    private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
-
     private ReleaseArchiver releaseArchiver;
 
     private final ModuleRepositoryProvider moduleRepositoryProvider;
-    private final Javalin webServer;
+    private final WebServer webServer;
 
-    private Collection<UpdatePublisher> updatePublishers = new ArrayList<>();
+    private Collection<EndPoint> endPoints = new ArrayList<>();
 
     private Database database;
     private BasicConfiguration configuration;
@@ -64,31 +57,32 @@ public class CloudNetUpdateServer {
 
         this.database = new H2Database(Paths.get("database"));
 
-        this.registerUpdatePublisher(new DiscordUpdatePublisher());
+        this.registerEndPoint(new DiscordEndPoint());
 
         CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
-        String gitHubApiBaseUrl = System.getProperty("cloudnet.repository.github.baseUrl", "https://api.github.com/repos/CloudNetService/CloudNet-v3/");
-        this.releaseArchiver = new ReleaseArchiver(gitHubApiBaseUrl, versionFileLoader, this.configuration.getVersionFileMappings());
+        this.releaseArchiver = new ReleaseArchiver(versionFileLoader);
 
-        this.webServer = Javalin.create();
+        this.webServer = new WebServer(Javalin.create(), this);
 
-        this.moduleRepositoryProvider = new ModuleRepositoryProvider(this.webServer);
+        this.moduleRepositoryProvider = new ModuleRepositoryProvider(this.webServer.getJavalin());
+
+        //TODO Add console commands (user list, user create, user delete)
 
         this.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopWithoutShutdown));
     }
 
-    public void registerUpdatePublisher(UpdatePublisher publisher) {
-        this.updatePublishers.add(publisher);
+    public void registerEndPoint(EndPoint endPoint) {
+        this.endPoints.add(endPoint);
     }
 
-    public Collection<UpdatePublisher> getUpdatePublishers() {
-        return this.updatePublishers;
+    public Collection<EndPoint> getEndPoints() {
+        return this.endPoints;
     }
 
-    public CloudNetVersion getCurrentLatestVersion() {
-        return this.database.getLatestVersion();
+    public CloudNetVersion getCurrentLatestVersion(String parentVersionName) {
+        return this.database.getLatestVersion(parentVersionName);
     }
 
     public Database getDatabase() {
@@ -99,6 +93,14 @@ public class CloudNetUpdateServer {
         return this.configuration;
     }
 
+    public Collection<CloudNetParentVersion> getParentVersions() {
+        return this.configuration.getParentVersions();
+    }
+
+    public Collection<String> getParentVersionNames() {
+        return this.getParentVersions().stream().map(CloudNetParentVersion::getName).collect(Collectors.toList());
+    }
+
     public void start() throws IOException {
 
         if (!this.database.init()) {
@@ -106,40 +108,18 @@ public class CloudNetUpdateServer {
             return;
         }
 
-        for (UpdatePublisher publisher : this.updatePublishers) {
-            Path configPath = Paths.get("publishers", publisher.getName() + ".json");
+        for (EndPoint endPoint : this.endPoints) {
+            Path configPath = Paths.get("endPoints", endPoint.getName() + ".json");
             Files.createDirectories(configPath.getParent());
-            publisher.setEnabled(publisher.init(this, configPath));
-            if (publisher.isEnabled()) {
-                System.out.println("Successfully initialized " + publisher.getName() + " publisher!");
+            endPoint.setEnabled(endPoint.init(this, configPath));
+            if (endPoint.isEnabled()) {
+                System.out.println("Successfully initialized " + endPoint.getName() + " end point!");
             } else {
-                System.err.println("Failed to initialize " + publisher.getName() + " publisher!");
+                System.err.println("Failed to initialize " + endPoint.getName() + " end point!");
             }
         }
 
-        JavalinJson.setToJsonMapper(JsonDocument.GSON::toJson);
-        JavalinJson.setFromJsonMapper(JsonDocument.GSON::fromJson);
-
-        this.webServer.config.requestCacheSize = 16384L;
-
-        this.webServer.config.addStaticFiles("/web");
-
-        this.webServer.get("/versions/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY, "CloudNet.zip", this));
-        this.webServer.get("/docs/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY, "index.html", this));
-
-        this.webServer.get("/api", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
-
-        this.webServer.before("/api/*", context -> {
-            if (!this.apiAvailable && !context.path().equalsIgnoreCase("/api/")) {
-                throw new InternalServerErrorResponse("API currently not available");
-            }
-        });
-        this.webServer.get("/api/versions", context -> context.result(JsonDocument.newDocument().append("versions", Arrays.stream(this.database.getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())).toPrettyJson()));
-        this.webServer.get("/api/versions/:version", context -> context.json(this.database.getVersion(context.pathParam("version"))));
-
-        this.webServer.post("/github", new GitHubWebHookReleaseEventHandler(this.configuration.getGitHubSecret(), this));
-
-        this.webServer.start(this.configuration.getWebPort());
+        this.webServer.init();
     }
 
     public void stop() {
@@ -156,34 +136,34 @@ public class CloudNetUpdateServer {
             exception.printStackTrace();
         }
 
-        for (UpdatePublisher publisher : this.updatePublishers) {
-            publisher.close();
+        for (EndPoint endPoint : this.endPoints) {
+            endPoint.close();
         }
     }
 
-    public void installLatestRelease() {
+    public void installLatestRelease(CloudNetParentVersion parentVersion) {
         try {
-            var version = this.releaseArchiver.installLatestRelease();
-            this.invokeReleasePublished(version);
+            var version = this.releaseArchiver.installLatestRelease(parentVersion);
+            this.invokeReleasePublished(parentVersion, version);
             this.database.registerVersion(version);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
     }
 
-    public void installLatestRelease(GitHubReleaseInfo release) {
+    public void installLatestRelease(CloudNetParentVersion parentVersion, GitHubReleaseInfo release) {
         try {
-            var version = this.releaseArchiver.installLatestRelease(release);
-            this.invokeReleasePublished(version);
+            var version = this.releaseArchiver.installLatestRelease(parentVersion, release);
+            this.invokeReleasePublished(parentVersion, version);
             this.database.registerVersion(version);
         } catch (IOException exception) {
             exception.printStackTrace();
         }
     }
 
-    private void invokeReleasePublished(CloudNetVersion version) {
-        for (UpdatePublisher publisher : this.updatePublishers) {
-            publisher.publishRelease(version);
+    private void invokeReleasePublished(CloudNetParentVersion parentVersion, CloudNetVersion version) {
+        for (EndPoint endPoint : this.endPoints) {
+            endPoint.publishRelease(parentVersion, version);
         }
     }
 

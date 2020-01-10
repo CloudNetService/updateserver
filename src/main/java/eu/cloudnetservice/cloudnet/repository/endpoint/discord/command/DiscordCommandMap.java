@@ -1,7 +1,7 @@
-package eu.cloudnetservice.cloudnet.repository.publisher.discord.command;
+package eu.cloudnetservice.cloudnet.repository.endpoint.discord.command;
 
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
 import eu.cloudnetservice.cloudnet.repository.util.StringUtils;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Message;
@@ -17,11 +17,11 @@ public class DiscordCommandMap {
 
     private String commandPrefix;
     private Map<String, DiscordCommand> commandMap = new HashMap<>();
-    private DiscordUpdatePublisher updatePublisher;
+    private DiscordEndPoint endPoint;
     private CloudNetUpdateServer updateServer;
 
-    public DiscordCommandMap(DiscordUpdatePublisher updatePublisher, CloudNetUpdateServer updateServer) {
-        this.updatePublisher = updatePublisher;
+    public DiscordCommandMap(DiscordEndPoint endPoint, CloudNetUpdateServer updateServer) {
+        this.endPoint = endPoint;
         this.updateServer = updateServer;
     }
 
@@ -47,7 +47,7 @@ public class DiscordCommandMap {
             this.commandMap.put(name.toLowerCase(), command);
         }
 
-        command.setUpdatePublisher(this.updatePublisher);
+        command.setEndPoint(this.endPoint);
         command.setUpdateServer(this.updateServer);
         command.setCommandMap(this);
     }
@@ -72,10 +72,9 @@ public class DiscordCommandMap {
             return false;
         }
         if (!command.canExecute(message.getMember())) {
-            message.getChannel().sendMessage("You are not allowed to use this command!").queue();
             return false;
         }
-        command.execute(message.getMember(), message.getChannel(), message, Arrays.copyOfRange(args, 1, args.length));
+        command.execute(message.getMember(), message.getChannel(), message, args[0], Arrays.copyOfRange(args, 1, args.length));
         return true;
     }
 

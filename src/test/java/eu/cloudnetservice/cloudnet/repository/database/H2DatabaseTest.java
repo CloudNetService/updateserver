@@ -26,11 +26,12 @@ public class H2DatabaseTest {
 
         assertTrue(database.init());
 
-        assertNull(database.getVersion("3.0.0"));
-        assertNull(database.getLatestVersion());
+        assertNull(database.getVersion("v3", "3.0.0"));
+        assertNull(database.getLatestVersion("v3"));
         assertEquals(0, database.getAllVersions().length);
 
         var oldVersion = new CloudNetVersion(
+                "v3",
                 "3.0.0",
                 new GitHubCommitInfo(
                         new GitHubAuthorInfo(
@@ -66,6 +67,7 @@ public class H2DatabaseTest {
         );
 
         var latestVersion = new CloudNetVersion(
+                "v3",
                 "3.1.0",
                 new GitHubCommitInfo(
                         new GitHubAuthorInfo(
@@ -102,17 +104,17 @@ public class H2DatabaseTest {
 
         database.registerVersion(oldVersion);
 
-        assertEquals(oldVersion, database.getLatestVersion());
-        assertEquals(oldVersion, database.getVersion("3.0.0"));
+        assertEquals(oldVersion, database.getLatestVersion("v3"));
+        assertEquals(oldVersion, database.getVersion("v3", "3.0.0"));
         assertEquals(1, database.getAllVersions().length);
 
         database.registerVersion(latestVersion);
 
-        assertEquals(oldVersion, database.getVersion("3.0.0"));
-        assertEquals(latestVersion, database.getVersion("3.1.0"));
+        assertEquals(oldVersion, database.getVersion("v3", "3.0.0"));
+        assertEquals(latestVersion, database.getVersion("v3", "3.1.0"));
         assertEquals(2, database.getAllVersions().length);
-        assertNotEquals(oldVersion, database.getLatestVersion());
-        assertEquals(latestVersion, database.getLatestVersion());
+        assertNotEquals(oldVersion, database.getLatestVersion("v3"));
+        assertEquals(latestVersion, database.getLatestVersion("v3"));
 
         database.close();
 

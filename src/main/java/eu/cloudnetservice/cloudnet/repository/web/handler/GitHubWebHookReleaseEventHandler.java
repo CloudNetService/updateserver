@@ -4,7 +4,8 @@ import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.github.webhook.GitHubReleaseAction;
 import eu.cloudnetservice.cloudnet.repository.github.webhook.GitHubWebHookAuthenticator;
-import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.endpoint.EndPoint;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
@@ -17,12 +18,12 @@ import java.security.NoSuchAlgorithmException;
 
 public class GitHubWebHookReleaseEventHandler implements Handler {
 
-    private String gitHubSecret;
     private CloudNetUpdateServer updateServer;
+    private CloudNetParentVersion parentVersion;
 
-    public GitHubWebHookReleaseEventHandler(String gitHubSecret, CloudNetUpdateServer updateServer) {
-        this.gitHubSecret = gitHubSecret;
+    public GitHubWebHookReleaseEventHandler(CloudNetUpdateServer updateServer, CloudNetParentVersion parentVersion) {
         this.updateServer = updateServer;
+        this.parentVersion = parentVersion;
     }
 
     @Override
@@ -31,7 +32,7 @@ public class GitHubWebHookReleaseEventHandler implements Handler {
         var body = context.bodyAsBytes();
 
         try {
-            if (!GitHubWebHookAuthenticator.validateSignature(hubSignature, this.gitHubSecret, body)) {
+            if (!GitHubWebHookAuthenticator.validateSignature(hubSignature, this.parentVersion.getGitHubSecret(), body)) {
                 throw new ForbiddenResponse();
             }
         } catch (DecoderException | IllegalArgumentException | InvalidKeyException | NoSuchAlgorithmException exception) {
@@ -51,14 +52,14 @@ public class GitHubWebHookReleaseEventHandler implements Handler {
 
             switch (action.getAction()) {
                 case "edited": {
-                    var version = this.updateServer.getDatabase().getVersion(release);
+                    var version = this.updateServer.getDatabase().getVersion(this.parentVersion.getName(), release);
                     if (version == null) {
                         throw new BadRequestResponse("No version for this release found");
                     }
                     System.out.println("Updating version " + version.getName() + "...");
                     version.setRelease(release);
-                    for (UpdatePublisher publisher : this.updateServer.getUpdatePublishers()) {
-                        publisher.updateRelease(version);
+                    for (EndPoint endPoint : this.updateServer.getEndPoints()) {
+                        endPoint.updateRelease(this.parentVersion, version);
                     }
                     this.updateServer.getDatabase().updateVersion(version);
                 }
@@ -66,18 +67,18 @@ public class GitHubWebHookReleaseEventHandler implements Handler {
 
                 case "published": {
                     System.out.println("Publishing github release " + release.getTagName() + "...");
-                    this.updateServer.installLatestRelease(release);
+                    this.updateServer.installLatestRelease(this.parentVersion, release);
                 }
                 break;
 
                 case "deleted": {
-                    var version = this.updateServer.getDatabase().getVersion(release);
+                    var version = this.updateServer.getDatabase().getVersion(this.parentVersion.getName(), release);
                     if (version == null) {
                         throw new BadRequestResponse("No version for this release found!");
                     }
                     System.out.println("Deleting version " + version.getName() + "...");
-                    for (UpdatePublisher publisher : this.updateServer.getUpdatePublishers()) {
-                        publisher.deleteRelease(version);
+                    for (EndPoint endPoint : this.updateServer.getEndPoints()) {
+                        endPoint.deleteRelease(this.parentVersion, version);
                     }
                     this.updateServer.getDatabase().updateVersion(version);
                 }

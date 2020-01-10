@@ -2,8 +2,10 @@ package eu.cloudnetservice.cloudnet.repository.loader;
 
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.Constants;
+import eu.cloudnetservice.cloudnet.repository.config.CloudNetVersionFileInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsArtifact;
 import eu.cloudnetservice.cloudnet.repository.loader.jenkins.JenkinsBuild;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
 import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
@@ -21,14 +23,12 @@ import java.util.zip.ZipInputStream;
 
 public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoader {
 
-    private String jenkinsJobURL = System.getProperty("cloudnet.repository.versions.source.jenkins", "https://ci.cloudnetservice.eu/job/CloudNetService/job/CloudNet-v3/job/master/");
     private String mavenRepositoryURL = System.getProperty("cloudnet.repository.maven.url", "https://cloudnetservice.eu/repositories");
-    private String cloudNetMavenGroup = System.getProperty("cloudnet.repository.maven.dependency.groupId", "de.dytanic.cloudnet");
 
     @Override
-    public CloudNetVersionFile[] loadLastVersionFiles(VersionFileMappings versionFileMappings) throws IOException {
+    public CloudNetVersionFile[] loadLastVersionFiles(CloudNetParentVersion parentVersion, VersionFileMappings versionFileMappings) throws IOException {
         var masterStatus = JsonDocument.newDocument();
-        this.loadJson(masterStatus, new URL(this.jenkinsJobURL + "api/json/"));
+        this.loadJson(masterStatus, new URL(parentVersion.getJenkinsBaseURL() + "api/json/"));
 
         var lastBuild = masterStatus.get("lastBuild", JenkinsBuild.class);
         var lastSuccessfulBuild = masterStatus.get("lastSuccessfulBuild", JenkinsBuild.class);
@@ -86,7 +86,7 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
 
                         if (path.getFileName().toString().endsWith(".cnl")) {
                             fileType = CloudNetVersionFile.FileType.CLOUDNET_CNL;
-                        } else if (this.isCloudNetModule(path)) {
+                        } else if (this.isCloudNetModule(parentVersion, path)) {
                             fileType = CloudNetVersionFile.FileType.MODULE;
                             artifactId = path.getFileName().toString();
                         } else {
@@ -99,7 +99,7 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
 
                         MavenVersionInfo versionInfo = artifactId != null ? new MavenVersionInfo(
                                 this.mavenRepositoryURL,
-                                this.cloudNetMavenGroup,
+                                parentVersion.getMavenGroupId(),
                                 versionFileMappings.getVersionName(artifactId)
                         ) : null;
 
@@ -112,26 +112,14 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        versionFiles.add(new CloudNetVersionFile(
-                new URL(lastBuild.getUrl() + "artifact/Javadoc.zip"),
-                "docs",
-                CloudNetVersionFile.FileType.JAVA_DOCS,
-                null
-        ));
-
-        versionFiles.add(new CloudNetVersionFile(
-                new URL(lastBuild.getUrl() + "artifact/CloudNet.zip"),
-                "CloudNet.zip",
-                CloudNetVersionFile.FileType.CLOUDNET_ZIP,
-                null
-        ));
-
-        versionFiles.add(new CloudNetVersionFile(
-                new URL(lastBuild.getUrl() + "artifact/cloudnet-launcher/build/libs/launcher.jar"),
-                "launcher.jar",
-                CloudNetVersionFile.FileType.CLOUDNET_JAR,
-                null
-        ));
+        for (CloudNetVersionFileInfo versionFile : parentVersion.getAdditionalVersionFiles()) {
+            versionFiles.add(new CloudNetVersionFile(
+                    new URL(lastBuild.getUrl() + "artifact/" + versionFile.getPath()),
+                    versionFile.getName(),
+                    versionFile.getFileType(),
+                    null
+            ));
+        }
 
         return versionFiles.toArray(CloudNetVersionFile[]::new);
     }

@@ -1,7 +1,7 @@
-package eu.cloudnetservice.cloudnet.repository.publisher.discord.command;
+package eu.cloudnetservice.cloudnet.repository.endpoint.discord.command;
 
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordUpdatePublisher;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
@@ -14,7 +14,7 @@ public abstract class DiscordCommand {
     private DiscordPermissionState[] allowedRoles;
 
     private CloudNetUpdateServer updateServer;
-    private DiscordUpdatePublisher updatePublisher;
+    private DiscordEndPoint endPoint;
     private DiscordCommandMap commandMap;
 
     public DiscordCommand(String[] names, DiscordPermissionState[] allowedRoles) {
@@ -30,8 +30,8 @@ public abstract class DiscordCommand {
         return this.allowedRoles;
     }
 
-    public DiscordUpdatePublisher getUpdatePublisher() {
-        return this.updatePublisher;
+    public DiscordEndPoint getEndPoint() {
+        return this.endPoint;
     }
 
     public CloudNetUpdateServer getServer() {
@@ -46,8 +46,8 @@ public abstract class DiscordCommand {
         this.updateServer = updateServer;
     }
 
-    public void setUpdatePublisher(DiscordUpdatePublisher updatePublisher) {
-        this.updatePublisher = updatePublisher;
+    public void setEndPoint(DiscordEndPoint endPoint) {
+        this.endPoint = endPoint;
     }
 
     public void setCommandMap(DiscordCommandMap commandMap) {
@@ -58,9 +58,9 @@ public abstract class DiscordCommand {
         if (this.allowedRoles.length == 0) {
             return true;
         }
-        return Arrays.stream(this.allowedRoles).anyMatch(state -> state.canInteract(this.updatePublisher, member));
+        return Arrays.stream(this.allowedRoles).anyMatch(state -> state.canInteract(this.endPoint, member));
     }
 
-    public abstract void execute(Member sender, MessageChannel channel, Message message, String[] args);
+    public abstract void execute(Member sender, MessageChannel channel, Message message, String label, String[] args);
 
 }

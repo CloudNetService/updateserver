@@ -6,15 +6,14 @@ import com.google.gson.JsonParser;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import de.dytanic.cloudnet.common.io.FileUtils;
 import eu.cloudnetservice.cloudnet.repository.Constants;
-import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.exception.CloudNetVersionInstallException;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubCommitInfo;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionLoadException;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
-import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,26 +32,22 @@ import java.util.zip.ZipInputStream;
 
 public class ReleaseArchiver {
 
-    private String gitHubApiBaseUrl;
     private CloudNetVersionFileLoader versionFileLoader;
-    private VersionFileMappings versionFileMappings;
 
-    public ReleaseArchiver(String gitHubApiBaseUrl, CloudNetVersionFileLoader versionFileLoader, VersionFileMappings versionFileMappings) {
-        this.gitHubApiBaseUrl = gitHubApiBaseUrl;
+    public ReleaseArchiver(CloudNetVersionFileLoader versionFileLoader) {
         this.versionFileLoader = versionFileLoader;
-        this.versionFileMappings = versionFileMappings;
     }
 
-    public CloudNetVersion installLatestRelease() throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
-        var gitHubRelease = this.loadLatestRelease();
+    public CloudNetVersion installLatestRelease(CloudNetParentVersion parentVersion) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
+        var gitHubRelease = this.loadLatestRelease(parentVersion.getGitHubApiURL());
         if (gitHubRelease == null) {
             throw new CloudNetVersionInstallException("No github release found!");
         }
-        return this.installLatestRelease(gitHubRelease);
+        return this.installLatestRelease(parentVersion, gitHubRelease);
     }
 
-    public CloudNetVersion installLatestRelease(GitHubReleaseInfo gitHubRelease) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
-        var versionFiles = this.versionFileLoader.loadLastVersionFiles(this.versionFileMappings);
+    public CloudNetVersion installLatestRelease(CloudNetParentVersion parentVersion, GitHubReleaseInfo gitHubRelease) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
+        var versionFiles = this.versionFileLoader.loadLastVersionFiles(parentVersion, parentVersion.getDefaultVersionFileMappings());
 
         var cloudNetVersion = gitHubRelease.getTagName(); //todo load Raw-Version out of cloudnet.jar instead of the tag
 
@@ -63,10 +58,10 @@ public class ReleaseArchiver {
         this.archiveFiles(cloudNetVersion, versionFiles);
         System.out.println("Successfully archived all CloudNet files!");
 
-        var releaseCommitUrl = this.findCommitUrl(gitHubRelease.getTagName());
+        var releaseCommitUrl = this.findCommitUrl(parentVersion.getGitHubApiURL(), gitHubRelease.getTagName());
         var releaseCommit = this.loadCommit(releaseCommitUrl);
 
-        return new CloudNetVersion(cloudNetVersion, releaseCommit, gitHubRelease, new Date(), versionFiles, this.versionFileMappings, new HashMap<>());
+        return new CloudNetVersion(parentVersion.getName(), cloudNetVersion, releaseCommit, gitHubRelease, new Date(), versionFiles, parentVersion.getDefaultVersionFileMappings(), new HashMap<>());
     }
 
     private GitHubCommitInfo loadCommit(String url) throws IOException {
@@ -75,16 +70,16 @@ public class ReleaseArchiver {
         }
     }
 
-    private GitHubReleaseInfo loadLatestRelease() throws IOException {
-        try (InputStream inputStream = new URL(this.gitHubApiBaseUrl + "releases/latest").openStream()) {
+    private GitHubReleaseInfo loadLatestRelease(String gitHubApiBaseUrl) throws IOException {
+        try (InputStream inputStream = new URL(gitHubApiBaseUrl + "releases/latest").openStream()) {
             return JsonDocument.newDocument()
                     .read(inputStream)
                     .toInstanceOf(GitHubReleaseInfo.class);
         }
     }
 
-    private String findCommitUrl(String tag) throws IOException {
-        try (InputStream inputStream = new URL(this.gitHubApiBaseUrl + "tags").openStream();
+    private String findCommitUrl(String gitHubApiBaseUrl, String tag) throws IOException {
+        try (InputStream inputStream = new URL(gitHubApiBaseUrl + "tags").openStream();
              Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
             JsonArray array = JsonParser.parseReader(reader).getAsJsonArray();
             for (JsonElement jsonElement : array) {

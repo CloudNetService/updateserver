@@ -1,14 +1,15 @@
-package eu.cloudnetservice.cloudnet.repository.publisher.discord;
+package eu.cloudnetservice.cloudnet.repository.endpoint.discord;
 
 import com.google.gson.reflect.TypeToken;
 import de.dytanic.cloudnet.common.concurrent.ITask;
 import de.dytanic.cloudnet.common.concurrent.ListenableTask;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordCommandMap;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordPermissionState;
-import eu.cloudnetservice.cloudnet.repository.publisher.UpdatePublisher;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.defaults.DiscordCommandDependency;
+import eu.cloudnetservice.cloudnet.repository.endpoint.EndPoint;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.DiscordCommandMap;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.DiscordPermissionState;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.defaults.DiscordCommandDependency;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -26,9 +27,10 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
-public class DiscordUpdatePublisher implements UpdatePublisher {
+public class DiscordEndPoint implements EndPoint {
 
     private static final String PROPERTIES_KEY_MESSAGES = "DiscordMessageIDs";
+    private static final String PROPERTIES_KEY_UPDATES_CHANNEL_ID = "DiscordUpdatesChannelId";
 
     private boolean enabled = false;
 
@@ -39,7 +41,6 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     private String commandPrefix;
     private Map<DiscordPermissionState, String> permissionStateRoles;
     private long updatesChannelId;
-    private TextChannel updatesChannel;
 
     public JDA getJda() {
         return this.jda;
@@ -98,11 +99,20 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
                     .build()
                     .awaitReady();
 
-            this.updatesChannel = this.jda.getTextChannelById(this.updatesChannelId);
-            if (this.updatesChannel == null) {
-                System.err.println("Discord Updates Channel not found!");
-                this.jda.shutdown();
-                return false;
+            for (CloudNetParentVersion parentVersion : updateServer.getParentVersions()) {
+                if (!parentVersion.getProperties().containsKey(PROPERTIES_KEY_UPDATES_CHANNEL_ID)) {
+                    parentVersion.getProperties().put(PROPERTIES_KEY_UPDATES_CHANNEL_ID, "1");
+                    updateServer.getConfiguration().save();
+                }
+            }
+
+            for (CloudNetParentVersion parentVersion : updateServer.getParentVersions()) {
+                TextChannel channel = this.jda.getTextChannelById(String.valueOf(parentVersion.getProperties().get(PROPERTIES_KEY_UPDATES_CHANNEL_ID)));
+                if (channel == null) {
+                    System.err.println("Discord Updates Channel for parent version " + parentVersion.getName() + " not found!");
+                    this.jda.shutdown();
+                    return false;
+                }
             }
 
             this.commandMap = new DiscordCommandMap(this, updateServer);
@@ -136,7 +146,7 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     }
 
     @Override
-    public void publishRelease(CloudNetVersion version) {
+    public void publishRelease(CloudNetParentVersion parentVersion, CloudNetVersion version) {
         Collection<String> messages = DiscordMessageSplitter.splitMessage(version.getRelease().getBody());
 
         Collection<String> messageIds = new ArrayList<>();
@@ -145,8 +155,10 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
             return null;
         });
 
+        TextChannel updatesChannel = this.jda.getTextChannelById(String.valueOf(parentVersion.getProperties().get(PROPERTIES_KEY_UPDATES_CHANNEL_ID)));
+
         Iterator<String> messageIterator = messages.iterator();
-        this.sendMessages(this.updatesChannel, message -> messageIds.add(message.getId()), () -> {
+        this.sendMessages(updatesChannel, message -> messageIds.add(message.getId()), () -> {
             try {
                 task.call();
             } catch (Exception exception) {
@@ -173,7 +185,7 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
     }
 
     @Override
-    public void updateRelease(CloudNetVersion version) {
+    public void updateRelease(CloudNetParentVersion parentVersion, CloudNetVersion version) {
         if (!version.getProperties().containsKey(PROPERTIES_KEY_MESSAGES)) {
             return;
         }
@@ -183,29 +195,36 @@ public class DiscordUpdatePublisher implements UpdatePublisher {
             System.err.println("Cannot update description because we cannot add more messages than we have!");
             return;
         }
+
+        TextChannel updatesChannel = this.jda.getTextChannelById(String.valueOf(parentVersion.getProperties().get(PROPERTIES_KEY_UPDATES_CHANNEL_ID)));
+
         String[] messages = newMessages.toArray(String[]::new);
+
         for (int i = 0; i < messageIds.length; i++) {
             String messageId = messageIds[i];
             if (messages.length > i) {
                 String message = messages[i];
-                this.updatesChannel.editMessageById(messageId, message).queue();
+                updatesChannel.editMessageById(messageId, message).queue();
             } else {
-                this.updatesChannel.deleteMessageById(messageId).queue();
+                updatesChannel.deleteMessageById(messageId).queue();
             }
         }
     }
 
     @Override
-    public void deleteRelease(CloudNetVersion version) {
+    public void deleteRelease(CloudNetParentVersion parentVersion, CloudNetVersion version) {
         if (!version.getProperties().containsKey(PROPERTIES_KEY_MESSAGES)) {
             return;
         }
+
+        TextChannel updatesChannel = this.jda.getTextChannelById(String.valueOf(parentVersion.getProperties().get(PROPERTIES_KEY_UPDATES_CHANNEL_ID)));
+
         Collection<String> messageIds = ((Collection<String>) version.getProperties().get(PROPERTIES_KEY_MESSAGES));
         if (messageIds.size() > 1) {
-            this.updatesChannel.deleteMessagesByIds(messageIds).queue();
+            updatesChannel.deleteMessagesByIds(messageIds).queue();
         } else {
             for (String messageId : messageIds) {
-                this.updatesChannel.deleteMessageById(messageId).queue();
+                updatesChannel.deleteMessageById(messageId).queue();
             }
         }
         version.getProperties().remove(PROPERTIES_KEY_MESSAGES);

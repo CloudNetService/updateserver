@@ -1,12 +1,11 @@
-package eu.cloudnetservice.cloudnet.repository.publisher.discord.command.defaults;
+package eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.defaults;
 
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordCommand;
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.command.DiscordPermissionState;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.DiscordCommand;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.DiscordPermissionState;
 import eu.cloudnetservice.cloudnet.repository.util.StringUtils;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.MavenVersionInfo;
-import eu.cloudnetservice.cloudnet.repository.version.VersionEnvironment;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
@@ -31,11 +30,16 @@ public class DiscordCommandDependency extends DiscordCommand {
 
 
     @Override
-    public void execute(Member sender, MessageChannel channel, Message message, String[] args) {
-        CloudNetVersion version = super.getServer().getCurrentLatestVersion();
+    public void execute(Member sender, MessageChannel channel, Message message, String label, String[] args) {
+        if (args.length == 0) {
+            channel.sendMessage("Please use \"" + super.getCommandMap().getCommandPrefix() + label + " <" + super.getServer().getParentVersionNames() + ">\"").queue();
+            return;
+        }
+
+        CloudNetVersion version = super.getServer().getCurrentLatestVersion(args[0]);
 
         if (version == null) {
-            channel.sendMessage("There is currently no version available!").queue();
+            channel.sendMessage("There is currently no version available for the parent \"" + args[0] + "\"!").queue();
             return;
         }
 
@@ -49,14 +53,8 @@ public class DiscordCommandDependency extends DiscordCommand {
             return;
         }
 
-        if (args.length == 1) {
-            VersionEnvironment environment;
-            try {
-                environment = VersionEnvironment.valueOf(args[0].toUpperCase());
-            } catch (Exception ignored) {
-                channel.sendMessage("That environment doesn't exist!").queue();
-                return;
-            }
+        if (args.length == 2) {
+            String environment = args[1];
 
             Collection<String> supportedDependencies = version.getVersionFileMappings().getSupportedDependencies(environment);
 
@@ -94,7 +92,7 @@ public class DiscordCommandDependency extends DiscordCommand {
 
         builder.setTitle("**Dependencies for CloudNet " + version.getName() + "**");
 
-        builder.setDescription("Use " + super.getCommandMap().getCommandPrefix() + super.getNames()[0] + " <" + Arrays.toString(VersionEnvironment.values()) + "> " +
+        builder.setDescription("Use " + super.getCommandMap().getCommandPrefix() + label + " <" + version.getVersionFileMappings().getAvailableEnvironments() + "> " +
                 "to get all dependencies that can be used for a specific environment"
         );
 

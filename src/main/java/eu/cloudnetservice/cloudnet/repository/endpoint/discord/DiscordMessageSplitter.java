@@ -1,4 +1,4 @@
-package eu.cloudnetservice.cloudnet.repository.publisher.discord;
+package eu.cloudnetservice.cloudnet.repository.endpoint.discord;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -4,10 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
-    <artifactId>CloudNet3-UpdateServer</artifactId>
+    <groupId>eu.cloudnetservice</groupId>
+    <artifactId>CloudNet-UpdateServer</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+
+    <properties>
+        <cloudnet.dependency.version>3.2.0-RELEASE</cloudnet.dependency.version>
+    </properties>
 
     <repositories>
         <repository>
@@ -25,7 +29,7 @@
         <dependency>
             <groupId>de.dytanic.cloudnet</groupId>
             <artifactId>cloudnet-common</artifactId>
-            <version>3.1.0-RELEASE</version>
+            <version>${cloudnet.dependency.version}</version>
             <scope>compile</scope>
         </dependency>
 
@@ -92,7 +96,7 @@
     </properties>
 
     <build>
-        <finalName>CloudNet3-UpdateServer</finalName>
+        <finalName>CloudNet-UpdateServer</finalName>
 
         <plugins>
             <plugin>

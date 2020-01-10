@@ -1,6 +1,7 @@
 package eu.cloudnetservice.cloudnet.repository.web.handler;
 
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
+import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.web.MimeTypes;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
@@ -14,14 +15,17 @@ public class ArchivedVersionHandler implements Handler {
     private Path baseDirectory;
     private String defaultFileName;
     private CloudNetUpdateServer updateServer;
+    private CloudNetParentVersion parentVersion;
 
-    public ArchivedVersionHandler(Path baseDirectory, CloudNetUpdateServer updateServer) {
+    public ArchivedVersionHandler(Path baseDirectory, CloudNetParentVersion parentVersion, CloudNetUpdateServer updateServer) {
         this.baseDirectory = baseDirectory;
+        this.parentVersion = parentVersion;
         this.updateServer = updateServer;
     }
 
-    public ArchivedVersionHandler(Path baseDirectory, String defaultFileName, CloudNetUpdateServer updateServer) {
+    public ArchivedVersionHandler(Path baseDirectory, CloudNetParentVersion parentVersion, String defaultFileName, CloudNetUpdateServer updateServer) {
         this.baseDirectory = baseDirectory;
+        this.parentVersion = parentVersion;
         this.defaultFileName = defaultFileName;
         this.updateServer = updateServer;
     }
@@ -39,7 +43,7 @@ public class ArchivedVersionHandler implements Handler {
         }
 
         if (version.equalsIgnoreCase("latest")) {
-            var latestVersion = this.updateServer.getCurrentLatestVersion();
+            var latestVersion = this.updateServer.getCurrentLatestVersion(this.parentVersion.getName());
             if (latestVersion == null) {
                 context.status(404).result("");
                 return;

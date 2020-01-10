@@ -12,6 +12,7 @@ import java.util.Map;
 @ToString
 public class CloudNetVersion {
 
+    private String parentVersionName;
     private String name;
     private GitHubCommitInfo commit;
     private GitHubReleaseInfo release;
@@ -20,7 +21,8 @@ public class CloudNetVersion {
     private VersionFileMappings versionFileMappings;
     private Map<String, Object> properties;
 
-    public CloudNetVersion(String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, VersionFileMappings versionFileMappings, Map<String, Object> properties) {
+    public CloudNetVersion(String parentVersionName, String name, GitHubCommitInfo commit, GitHubReleaseInfo release, Date releaseDate, CloudNetVersionFile[] files, VersionFileMappings versionFileMappings, Map<String, Object> properties) {
+        this.parentVersionName = parentVersionName;
         this.name = name;
         this.commit = commit;
         this.release = release;
@@ -28,6 +30,10 @@ public class CloudNetVersion {
         this.files = files;
         this.versionFileMappings = versionFileMappings;
         this.properties = properties;
+    }
+
+    public String getParentVersionName() {
+        return this.parentVersionName;
     }
 
     public String getName() {

@@ -1,6 +1,6 @@
-package eu.cloudnetservice.cloudnet.repository.publisher;
+package eu.cloudnetservice.cloudnet.repository.endpoint;
 
-import eu.cloudnetservice.cloudnet.repository.publisher.discord.DiscordMessageSplitter;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordMessageSplitter;
 import org.junit.Test;
 
 import java.util.Collection;
@@ -8,7 +8,7 @@ import java.util.Random;
 
 import static org.junit.Assert.*;
 
-public class DiscordUpdatePublisherTest {
+public class DiscordEndPointTest {
 
     private int ranInt(Random random, int min, int max) {
         return random.nextInt(max - min) + min;
