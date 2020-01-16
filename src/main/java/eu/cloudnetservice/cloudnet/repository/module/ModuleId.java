@@ -30,11 +30,19 @@ public class ModuleId {
         return version;
     }
 
+    public ModuleId ignoreVersion() {
+        return new ModuleId(this.group, this.name);
+    }
+
     @Override
     public String toString() {
         return this.version != null ?
                 this.group + ":" + this.name + ":" + this.version :
                 this.group + ":" + this.name;
+    }
+
+    public boolean equalsIgnoreVersion(ModuleId moduleId) {
+        return group.equals(moduleId.group) && name.equals(moduleId.name);
     }
 
     @Override
@@ -51,4 +59,13 @@ public class ModuleId {
     public int hashCode() {
         return Objects.hash(group, name, version);
     }
+
+    public static ModuleId parse(String rawModuleId) {
+        String[] split = rawModuleId.split(":");
+        if (split.length != 2 && split.length != 3) {
+            return null;
+        }
+        return new ModuleId(split[0], split[1], split.length == 3 ? split[2] : null);
+    }
+
 }

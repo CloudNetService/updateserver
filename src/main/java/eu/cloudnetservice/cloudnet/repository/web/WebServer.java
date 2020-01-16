@@ -4,21 +4,27 @@ import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.Constants;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
+import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
+import eu.cloudnetservice.cloudnet.repository.module.ModuleInstallException;
+import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler;
 import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
 import io.javalin.Javalin;
-import io.javalin.http.BadRequestResponse;
-import io.javalin.http.ForbiddenResponse;
-import io.javalin.http.InternalServerErrorResponse;
-import io.javalin.http.UnauthorizedResponse;
+import io.javalin.http.*;
 import io.javalin.plugin.json.JavalinJson;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static io.javalin.apibuilder.ApiBuilder.*;
+
 public class WebServer {
+
+    private static final String SUCCESS_JSON = JsonDocument.newDocument("success", true).toPrettyJson();
 
     private Javalin javalin;
     private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
@@ -50,7 +56,7 @@ public class WebServer {
         this.javalin.config.addStaticFiles("/web");
 
         this.javalin.config.accessManager((handler, ctx, permittedRoles) -> {
-            if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
+            /*if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
                 handler.handle(ctx);
                 return;
             }
@@ -74,7 +80,7 @@ public class WebServer {
             }
 
             ctx.header("User-Role", role.name());
-            ctx.header("User-Role-ID", String.valueOf(role.ordinal()));
+            ctx.header("User-Role-ID", String.valueOf(role.ordinal()));*/
 
             handler.handle(ctx);
         });
@@ -105,73 +111,225 @@ public class WebServer {
         for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {
             this.javalin.post(parentVersion.getGitHubWebHookPath(), new GitHubWebHookReleaseEventHandler(this.server, parentVersion));
 
-            this.javalin.get("/api/faq/" + parentVersion.getName(), context -> context.json(this.server.getDatabase().getFAQEntries(parentVersion.getName())));
-            this.javalin.get("/api/faq/" + parentVersion.getName() + "/:language", context -> context.json(
-                    Arrays.stream(this.server.getDatabase().getFAQEntries(parentVersion.getName()))
-                            .filter(entry -> entry.getLanguage().equalsIgnoreCase(context.pathParam("language")))
-                            .toArray()
-            ));
+            this.javalin.get("/versions/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "CloudNet.zip", this.server));
+            this.javalin.get("/docs/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "index.html", this.server));
 
-            this.javalin.get("/versions/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY, parentVersion, "CloudNet.zip", this.server));
-            this.javalin.get("/docs/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY, parentVersion, "index.html", this.server));
-
-            //todo fix "Ã¼" -> "ö"
-            this.javalin.post("/admin/api/faq/" + parentVersion.getName(), context -> {
-                UUID uniqueId = UUID.randomUUID();
-                String question = context.header("X-Question");
-                String answer = context.header("X-Answer");
-                String language = context.header("X-Language");
-                if (language == null || language.isEmpty()) {
-                    language = "english";
-                }
-
-                if (this.server.getDatabase().getFAQEntry(uniqueId) != null) {
-                    throw new BadRequestResponse("An FAQ entry with that id already exists");
-                }
-                this.server.getDatabase().insertFAQEntry(new FAQEntry(
-                        uniqueId,
-                        language,
-                        parentVersion.getName(),
-                        System.currentTimeMillis(),
-                        question,
-                        answer,
-                        context.basicAuthCredentials().getUsername(),
-                        new HashMap<>()
-                ));
-
-                System.out.println("FAQ entry inserted ");
-            }, Set.of(WebPermissionRole.MODERATOR));
-            this.javalin.patch("/admin/api/faq/" + parentVersion.getName(), context -> {
-                if (context.header("X-Entry-ID") == null) {
-                    throw new BadRequestResponse("Missing X-Entry-ID header");
-                }
-                UUID uniqueId = UUID.fromString(Objects.requireNonNull(context.header("X-Entry-ID")));
-                String question = context.header("X-Question");
-                String answer = context.header("X-Answer");
-
-                FAQEntry entry = this.server.getDatabase().getFAQEntry(uniqueId);
-                if (entry == null) {
-                    throw new BadRequestResponse("FAQ entry with that ID not found");
-                }
-                entry.setQuestion(question);
-                entry.setAnswer(answer);
-                this.server.getDatabase().updateFAQEntry(entry);
-            }, Set.of(WebPermissionRole.MODERATOR));
-            this.javalin.delete("/admin/api/faq/" + parentVersion.getName(), context -> {
-                UUID uniqueId = UUID.fromString(Objects.requireNonNull(context.header("X-Entry-ID")));
-
-                FAQEntry entry = this.server.getDatabase().getFAQEntry(uniqueId);
-                if (entry == null) {
-                    throw new BadRequestResponse("FAQ entry with that ID not found");
-                }
-
-                this.server.getDatabase().deleteFAQEntry(entry.getUniqueId());
-            }, Set.of(WebPermissionRole.MODERATOR));
+            this.initFAQAPI(parentVersion);
+            this.initModuleAPI(parentVersion);
         }
+
+        this.javalin.get("/api/modules/list", context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos()));
+        this.javalin.exception(ModuleInstallException.class, (exception, context) -> context.status(400).contentType("application/json").result(JsonDocument.newDocument()
+                .append("message", exception.getMessage())
+                .append("status", 400)
+                .toPrettyJson()
+        ));
 
         this.javalin.get("/admin/api", context -> context.result("{}"), Set.of(WebPermissionRole.MEMBER));
 
         this.javalin.start(this.server.getConfiguration().getWebPort());
+    }
+
+    private void initFAQAPI(CloudNetParentVersion parentVersion) {
+        this.javalin.routes(() -> {
+            path("/api/faq/" + parentVersion.getName(), () -> {
+                get(context -> context.json(this.server.getDatabase().getFAQEntries(parentVersion.getName())));
+                get("/:language", context -> context.json(
+                        Arrays.stream(this.server.getDatabase().getFAQEntries(parentVersion.getName()))
+                                .filter(entry -> entry.getLanguage().equalsIgnoreCase(context.pathParam("language")))
+                                .toArray()
+                ));
+            });
+
+            path("/admin/api/faq/" + parentVersion.getName(), () -> {
+                //todo fix "Ã¼" -> "ö"
+                post(context -> this.addFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
+                patch(context -> this.updateFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
+                delete(context -> this.deleteFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
+            });
+        });
+    }
+
+    private void addFAQEntry(CloudNetParentVersion parentVersion, Context context) {
+        UUID uniqueId = UUID.randomUUID();
+        String question = context.header("X-Question");
+        String answer = context.header("X-Answer");
+        String language = context.header("X-Language");
+        if (language == null || language.isEmpty()) {
+            language = "english";
+        }
+
+        if (this.server.getDatabase().getFAQEntry(uniqueId) != null) {
+            throw new BadRequestResponse("An FAQ entry with that id already exists");
+        }
+        this.server.getDatabase().insertFAQEntry(new FAQEntry(
+                uniqueId,
+                language,
+                parentVersion.getName(),
+                System.currentTimeMillis(),
+                question,
+                answer,
+                context.basicAuthCredentials().getUsername(),
+                new HashMap<>()
+        ));
+
+        System.out.println("FAQ entry inserted by " + context.basicAuthCredentials().getUsername());
+    }
+
+    private void updateFAQEntry(CloudNetParentVersion parentVersion, Context context) {
+        if (context.header("X-Entry-ID") == null) {
+            throw new BadRequestResponse("Missing X-Entry-ID header");
+        }
+        UUID uniqueId = UUID.fromString(Objects.requireNonNull(context.header("X-Entry-ID")));
+        String question = context.header("X-Question");
+        String answer = context.header("X-Answer");
+
+        FAQEntry entry = this.server.getDatabase().getFAQEntry(uniqueId);
+        if (entry == null) {
+            throw new BadRequestResponse("FAQ entry with that ID not found");
+        }
+        entry.setQuestion(question);
+        entry.setAnswer(answer);
+        this.server.getDatabase().updateFAQEntry(entry);
+
+        System.out.println("FAQEntry updated by " + context.basicAuthCredentials().getUsername());
+    }
+
+    private void deleteFAQEntry(CloudNetParentVersion parentVersion, Context context) {
+        UUID uniqueId = UUID.fromString(Objects.requireNonNull(context.header("X-Entry-ID")));
+
+        FAQEntry entry = this.server.getDatabase().getFAQEntry(uniqueId);
+        if (entry == null) {
+            throw new BadRequestResponse("FAQ entry with that ID not found");
+        }
+
+        this.server.getDatabase().deleteFAQEntry(entry.getUniqueId());
+
+        System.out.println("FAQEntry deleted by " + context.basicAuthCredentials().getUsername());
+    }
+
+    private void initModuleAPI(CloudNetParentVersion parentVersion) {
+        this.javalin.routes(() -> {
+            path("/api/" + parentVersion.getName() + "/modules", () -> {
+                get("/list", context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName())));
+                get("/list/:group",
+                        context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName(), context.pathParam("group")))
+                );
+                get("/list/:group/:name",
+                        context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName(), context.pathParam("group"), context.pathParam("name")))
+                );
+                get("/file/:group/:name",
+                        context -> context.contentType("application/zip").result(this.server.getModuleRepositoryProvider().openLatestModuleStream(
+                                parentVersion.getName(),
+                                new ModuleId(context.pathParam("group"), context.pathParam("name"))
+                        ))
+                );
+                get("/file/:group/:name/:version",
+                        context -> context.contentType("application/zip").result(this.server.getModuleRepositoryProvider().openModuleStream(
+                                parentVersion.getName(),
+                                new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"))
+                        ))
+                );
+            });
+
+            path("/admin/api/" + parentVersion.getName() + "/modules", () -> {
+                path("/:group/:name/:version", () -> {
+                    post(context -> this.addVersion(parentVersion, context));
+                    patch(context -> this.updateVersion(parentVersion, context));
+                });
+            });
+        });
+
+
+    }
+
+    private void addVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {
+        Map<String, String> headers = context.headerMap();
+        String[] authors = headers.getOrDefault("X-Authors", "Unknown").split(";");
+        ModuleId[] depends = Arrays.stream(headers.getOrDefault("X-Depends", "").split(";"))
+                .map(ModuleId::parse)
+                .filter(Objects::nonNull)
+                .toArray(ModuleId[]::new);
+        ModuleId[] conflicts = Arrays.stream(headers.getOrDefault("X-Conflicts", "").split(";"))
+                .map(ModuleId::parse)
+                .filter(Objects::nonNull)
+                .toArray(ModuleId[]::new);
+        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"));
+        String description = headers.computeIfAbsent("X-Description", s -> {
+            throw new BadRequestResponse("description is required");
+        });
+        String website = headers.get("X-Website");
+        String sourceUrl = headers.computeIfAbsent("X-SourceURL", s -> {
+            throw new BadRequestResponse("SourceCode is required");
+        });
+        String supportUrl = headers.get("X-SupportURL");
+
+        RepositoryModuleInfo moduleInfo = new RepositoryModuleInfo(
+                moduleId,
+                authors,
+                depends,
+                conflicts,
+                parentVersion.getName(),
+                this.server.getCurrentLatestVersion(parentVersion.getName()).getName(),
+                description,
+                website,
+                sourceUrl,
+                supportUrl
+        );
+        this.server.getModuleRepositoryProvider().addModule(moduleInfo, new ByteArrayInputStream(context.bodyAsBytes()));
+
+        System.out.println("Module added by " + context.basicAuthCredentials().getUsername());
+        context.result(SUCCESS_JSON);
+    }
+
+    private void updateVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {
+        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"));
+        RepositoryModuleInfo oldModuleInfo = this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersion.getName(), moduleId);
+
+        if (oldModuleInfo == null) {
+            throw new BadRequestResponse("Version not found");
+        }
+
+        Map<String, String> headers = context.headerMap();
+        String[] authors = headers.containsKey("X-Authors") ? headers.get("X-Authors").split(";") : oldModuleInfo.getAuthors();
+        ModuleId[] depends = headers.containsKey("X-Depends") ? Arrays.stream(headers.getOrDefault("X-Depends", "").split(";"))
+                .map(ModuleId::parse)
+                .filter(Objects::nonNull)
+                .toArray(ModuleId[]::new) : oldModuleInfo.getDepends();
+        ModuleId[] conflicts = headers.containsKey("X-Conflicts") ? Arrays.stream(headers.getOrDefault("X-Conflicts", "").split(";"))
+                .map(ModuleId::parse)
+                .filter(Objects::nonNull)
+                .toArray(ModuleId[]::new) : oldModuleInfo.getConflicts();
+        String description = headers.getOrDefault("X-Description", oldModuleInfo.getDescription());
+        String website = headers.getOrDefault("X-Website", oldModuleInfo.getWebsite());
+        String sourceUrl = headers.getOrDefault("X-SourceURL", oldModuleInfo.getSourceUrl());
+        String supportUrl = headers.getOrDefault("X-SupportURL", oldModuleInfo.getSupportUrl());
+
+        RepositoryModuleInfo moduleInfo = new RepositoryModuleInfo(
+                moduleId,
+                authors,
+                depends,
+                conflicts,
+                parentVersion.getName(),
+                this.server.getCurrentLatestVersion(parentVersion.getName()).getName(),
+                description,
+                website,
+                sourceUrl,
+                supportUrl
+        );
+
+        if (oldModuleInfo.getModuleId().getVersion().equals(moduleId.getVersion())) {
+            this.server.getModuleRepositoryProvider().updateModule(moduleInfo);
+
+            System.out.println("Module updated by " + context.basicAuthCredentials().getUsername());
+            context.result(SUCCESS_JSON);
+            return;
+        }
+
+        this.server.getModuleRepositoryProvider().updateModuleWithFile(moduleInfo, new ByteArrayInputStream(context.bodyAsBytes()));
+
+        System.out.println("Module updated by " + context.basicAuthCredentials().getUsername());
+        context.result(SUCCESS_JSON);
     }
 
     private String getVersionOrLatest(String parentVersionName, String version) {

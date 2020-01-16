@@ -2,9 +2,10 @@ package eu.cloudnetservice.cloudnet.repository.database;
 
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
+import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
+import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
-import eu.cloudnetservice.cloudnet.repository.web.WebUser;
 
 import java.io.Closeable;
 import java.util.Arrays;
@@ -63,5 +64,15 @@ public interface Database extends Closeable {
     void updateUserRole(String username, WebPermissionRole newPermissionRole);
 
     void updateUserPassword(String username, String newPassword);
+
+    void insertModuleInfo(RepositoryModuleInfo moduleInfo);
+
+    void updateModuleInfo(RepositoryModuleInfo moduleInfo);
+
+    void removeModuleInfo(RepositoryModuleInfo moduleInfo);
+
+    void removeModuleInfo(ModuleId moduleId);
+
+    RepositoryModuleInfo[] getModuleInfos();
 
 }

@@ -6,30 +6,36 @@ public class RepositoryModuleInfo {
     private String[] authors;
     private ModuleId[] depends;
     private ModuleId[] conflicts;
+    private String parentVersionName;
     private String requiredCloudNetVersion;
     private String description;
     private String website;
     private String sourceUrl;
     private String supportUrl;
-    private String downloadUrl;
 
-    public RepositoryModuleInfo(ModuleId moduleId, String[] authors, ModuleId[] depends, ModuleId[] conflicts, String requiredCloudNetVersion, String description, String website, String sourceUrl, String supportUrl, String downloadUrl) {
+    public RepositoryModuleInfo(ModuleId moduleId, String[] authors, ModuleId[] depends, ModuleId[] conflicts,
+                                String parentVersionName, String requiredCloudNetVersion, String description,
+                                String website, String sourceUrl, String supportUrl) {
         this.moduleId = moduleId;
         this.authors = authors;
         this.depends = depends;
         this.conflicts = conflicts;
+        this.parentVersionName = parentVersionName;
         this.requiredCloudNetVersion = requiredCloudNetVersion;
         this.description = description;
         this.website = website;
         this.sourceUrl = sourceUrl;
         this.supportUrl = supportUrl;
-        this.downloadUrl = downloadUrl;
     }
 
     public ModuleId getModuleId() {
         return moduleId;
     }
 
+    public String getParentVersionName() {
+        return this.parentVersionName;
+    }
+    
     public String getRequiredCloudNetVersion() {
         return this.requiredCloudNetVersion;
     }
@@ -62,7 +68,4 @@ public class RepositoryModuleInfo {
         return this.description;
     }
 
-    public String getDownloadUrl() {
-        return this.downloadUrl;
-    }
 }

@@ -52,10 +52,10 @@ public class ReleaseArchiver {
         var cloudNetVersion = gitHubRelease.getTagName(); //todo load Raw-Version out of cloudnet.jar instead of the tag
 
         System.out.println("Extracting docs for CloudNet " + cloudNetVersion + "...");
-        this.generateDocs(cloudNetVersion, versionFiles);
+        this.generateDocs(parentVersion.getName(), cloudNetVersion, versionFiles);
         System.out.println("Successfully extracted the docs for CloudNet!");
         System.out.println("Archiving all CloudNet files for the AutoUpdater...");
-        this.archiveFiles(cloudNetVersion, versionFiles);
+        this.archiveFiles(parentVersion.getName(), cloudNetVersion, versionFiles);
         System.out.println("Successfully archived all CloudNet files!");
 
         var releaseCommitUrl = this.findCommitUrl(parentVersion.getGitHubApiURL(), gitHubRelease.getTagName());
@@ -92,8 +92,8 @@ public class ReleaseArchiver {
         return null;
     }
 
-    private void archiveFiles(String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {
-        var directory = Constants.VERSIONS_DIRECTORY.resolve(cloudNetVersion);
+    private void archiveFiles(String parentVersionName, String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {
+        var directory = Constants.VERSIONS_DIRECTORY.resolve(parentVersionName).resolve(cloudNetVersion);
 
         if (Files.exists(directory)) {
             FileUtils.delete(directory.toFile());
@@ -115,8 +115,8 @@ public class ReleaseArchiver {
 
     }
 
-    private void generateDocs(String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {
-        var docsDirectory = Constants.DOCS_DIRECTORY.resolve(cloudNetVersion);
+    private void generateDocs(String parentVersionName, String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {
+        var docsDirectory = Constants.DOCS_DIRECTORY.resolve(parentVersionName).resolve(cloudNetVersion);
 
         if (Files.exists(docsDirectory)) {
             FileUtils.delete(docsDirectory.toFile());

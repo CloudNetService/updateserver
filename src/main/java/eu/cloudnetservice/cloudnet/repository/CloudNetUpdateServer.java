@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
@@ -64,9 +65,9 @@ public class CloudNetUpdateServer {
 
         this.webServer = new WebServer(Javalin.create(), this);
 
-        this.moduleRepositoryProvider = new ModuleRepositoryProvider(this.webServer.getJavalin());
+        this.moduleRepositoryProvider = new ModuleRepositoryProvider(this);
 
-        //TODO Add console commands (user list, user create, user delete)
+          //TODO Add console commands (user list, user create, user delete)
 
         this.start();
 
@@ -93,12 +94,20 @@ public class CloudNetUpdateServer {
         return this.configuration;
     }
 
+    public ModuleRepositoryProvider getModuleRepositoryProvider() {
+        return this.moduleRepositoryProvider;
+    }
+
     public Collection<CloudNetParentVersion> getParentVersions() {
         return this.configuration.getParentVersions();
     }
 
     public Collection<String> getParentVersionNames() {
         return this.getParentVersions().stream().map(CloudNetParentVersion::getName).collect(Collectors.toList());
+    }
+
+    public Optional<CloudNetParentVersion> getParentVersion(String name) {
+        return this.getParentVersions().stream().filter(parentVersion -> parentVersion.getName().equals(name)).findFirst();
     }
 
     public void start() throws IOException {

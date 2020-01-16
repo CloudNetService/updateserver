@@ -3,6 +3,8 @@ package eu.cloudnetservice.cloudnet.repository.database;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
+import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
+import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
 import eu.cloudnetservice.cloudnet.repository.util.StringUtils;
 import eu.cloudnetservice.cloudnet.repository.util.ThrowingConsumer;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
@@ -28,6 +30,7 @@ public class H2Database implements Database {
     private CloudNetVersion[] cachedVersions;
     private FAQEntry[] cachedFAQEntries;
     private WebUser[] cachedUsers;
+    private RepositoryModuleInfo[] cachedModules;
 
     public H2Database(Path mvStorePath) {
         this.mvStorePath = mvStorePath;
@@ -42,6 +45,7 @@ public class H2Database implements Database {
             this.executeUpdate("CREATE TABLE IF NOT EXISTS versions (name VARCHAR(128), content TEXT)");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS faq (uniqueId BINARY(16), content TEXT)");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS users (username VARCHAR(128), password TEXT, role VARCHAR(32))");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128), content TEXT)");
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
@@ -49,6 +53,7 @@ public class H2Database implements Database {
         this.cacheVersions();
         this.cacheFAQEntries();
         this.cacheUsers();
+        this.cacheModules();
 
         return true;
     }
@@ -261,6 +266,46 @@ public class H2Database implements Database {
         this.cacheUsers();
     }
 
+    @Override
+    public void insertModuleInfo(RepositoryModuleInfo moduleInfo) {
+        this.executeUpdate(
+                "INSERT INTO modules (moduleId, content) VALUES (?, ?)",
+                preparedStatement -> {
+                    preparedStatement.setString(1, moduleInfo.getModuleId().ignoreVersion().toString());
+                    preparedStatement.setString(2, this.gson.toJson(moduleInfo));
+                }
+        );
+        this.cacheModules();
+    }
+
+    @Override
+    public void updateModuleInfo(RepositoryModuleInfo moduleInfo) {
+        this.executeUpdate(
+                "UPDATE modules SET content = ? WHERE moduleId = ?",
+                preparedStatement -> {
+                    preparedStatement.setString(1, this.gson.toJson(moduleInfo));
+                    preparedStatement.setString(2, moduleInfo.getModuleId().ignoreVersion().toString());
+                }
+        );
+        this.cacheModules();
+    }
+
+    @Override
+    public void removeModuleInfo(RepositoryModuleInfo moduleInfo) {
+        this.removeModuleInfo(moduleInfo.getModuleId());
+    }
+
+    @Override
+    public void removeModuleInfo(ModuleId moduleId) {
+        this.executeUpdate("DELETE FROM modules WHERE moduleId = ?", preparedStatement -> preparedStatement.setString(1, moduleId.ignoreVersion().toString()));
+        this.cacheModules();
+    }
+
+    @Override
+    public RepositoryModuleInfo[] getModuleInfos() {
+        return this.cachedModules;
+    }
+
     private byte[] uuidToBytes(UUID uuid) {
         return ByteBuffer.allocate(16).putLong(uuid.getMostSignificantBits()).putLong(uuid.getLeastSignificantBits()).array();
     }
@@ -313,6 +358,19 @@ public class H2Database implements Database {
             exception.printStackTrace();
         }
         this.cachedUsers = users.toArray(WebUser[]::new);
+    }
+
+    private void cacheModules() {
+        Collection<RepositoryModuleInfo> moduleInfos = new ArrayList<>();
+        try (PreparedStatement statement = this.connection.prepareStatement("SELECT * FROM modules");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                moduleInfos.add(this.gson.fromJson(resultSet.getString("content"), RepositoryModuleInfo.class));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        this.cachedModules = moduleInfos.toArray(RepositoryModuleInfo[]::new);
     }
 
     @Override
