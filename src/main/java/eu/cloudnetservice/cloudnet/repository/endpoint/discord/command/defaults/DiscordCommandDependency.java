@@ -78,7 +78,8 @@ public class DiscordCommandDependency extends DiscordCommand {
                         this.dependencyFormat
                                 .replace("%groupId%", versionInfo.getGroupId())
                                 .replace("%artifactId%", artifact)
-                                .replace("%version%", version.getName()),
+                                .replace("%version%", version.getName())
+                                + " [Download Jar](" + versionInfo.getFullURL(version.getName()) + ")",
                         true
                 );
             }
@@ -92,7 +93,7 @@ public class DiscordCommandDependency extends DiscordCommand {
 
         builder.setTitle("**Dependencies for CloudNet " + version.getName() + "**");
 
-        builder.setDescription("Use " + super.getCommandMap().getCommandPrefix() + label + " <" + version.getVersionFileMappings().getAvailableEnvironments() + "> " +
+        builder.setDescription("Use \"" + super.getCommandMap().getCommandPrefix() + label + " <" + super.getServer().getParentVersionNames() + "> <" + version.getVersionFileMappings().getAvailableEnvironments() + ">\" " +
                 "to get all dependencies that can be used for a specific environment"
         );
 

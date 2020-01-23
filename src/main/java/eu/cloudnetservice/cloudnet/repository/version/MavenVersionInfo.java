@@ -28,4 +28,9 @@ public class MavenVersionInfo {
     public String getArtifactId() {
         return this.artifactId;
     }
+
+    public String getFullURL(String version) {
+        return this.repositoryUrl + "/" + (this.groupId.replace('.', '/')) + "/" + this.artifactId + "/" + version + "/" + artifactId + "-" + version + ".jar";
+    }
+
 }
