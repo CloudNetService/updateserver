@@ -30,7 +30,7 @@ public class MimeTypes {
 
     public static String getTypeFromPath(Path path) {
         String name = path.getFileName().toString();
-        int pointIndex = name.indexOf('.');
+        int pointIndex = name.lastIndexOf('.');
         if (pointIndex == -1) {
             return "text/plain";
         }
