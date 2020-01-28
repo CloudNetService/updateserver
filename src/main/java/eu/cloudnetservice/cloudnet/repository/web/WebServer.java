@@ -249,7 +249,6 @@ public class WebServer {
             });
 
             path("/admin/api/faq/:parent", () -> {
-                //todo fix "Ã¼" -> "ö"
                 before(context -> {
                     if (this.server.getParentVersion(context.pathParam("parent")).isEmpty()) {
                         throw new NotFoundResponse();
@@ -278,7 +277,7 @@ public class WebServer {
             throw new BadRequestResponse("Missing question or answer header");
         }
 
-        this.server.getDatabase().insertFAQEntry(new FAQEntry(
+        FAQEntry entry = new FAQEntry(
                 uniqueId,
                 language,
                 parentVersion.getName(),
@@ -287,9 +286,14 @@ public class WebServer {
                 answer,
                 context.basicAuthCredentials().getUsername(),
                 new HashMap<>()
-        ));
+        );
+        this.server.getDatabase().insertFAQEntry(entry);
 
-        System.out.println("FAQ entry inserted by " + context.basicAuthCredentials().getUsername());
+        context.json(entry);
+
+        System.out.println("FAQ entry " + uniqueId + " inserted by " + context.basicAuthCredentials().getUsername() + ": ");
+        System.out.println(" - Question: " + question);
+        System.out.println(" - Answer: " + answer);
     }
 
     private void updateFAQEntry(CloudNetParentVersion parentVersion, Context context) {
@@ -423,6 +427,10 @@ public class WebServer {
     }
 
     private void addVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {
+        if (this.server.getCurrentLatestVersion(parentVersion.getName()) == null) {
+            throw new BadRequestResponse("No versions have been released for this parent");
+        }
+
         Map<String, String> headers = context.headerMap();
         String[] authors = headers.getOrDefault("X-Authors", "Unknown").split(";");
         ModuleId[] depends = Arrays.stream(headers.getOrDefault("X-Depends", "").split(";"))

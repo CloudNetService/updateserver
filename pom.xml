@@ -12,6 +12,8 @@
     <properties>
         <cloudnet.dependency.version>3.2.0-RELEASE</cloudnet.dependency.version>
         <system.version>1.0</system.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.targetEncoding>UTF-8</project.build.targetEncoding>
     </properties>
 
     <repositories>

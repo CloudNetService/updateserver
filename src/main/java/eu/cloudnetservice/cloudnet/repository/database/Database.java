@@ -9,6 +9,7 @@ import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
 
 import java.io.Closeable;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -46,6 +47,8 @@ public interface Database extends Closeable {
     FAQEntry getFAQEntry(UUID uniqueId);
 
     void deleteFAQEntry(UUID uniqueId);
+
+    Collection<String> getUserNames();
 
     boolean checkUserPassword(String username, String password);
 

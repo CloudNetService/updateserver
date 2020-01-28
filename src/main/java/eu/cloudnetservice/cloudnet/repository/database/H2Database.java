@@ -16,6 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class H2Database implements Database {
 
@@ -178,6 +179,11 @@ public class H2Database implements Database {
                 preparedStatement -> preparedStatement.setBytes(1, this.uuidToBytes(uniqueId))
         );
         this.cacheFAQEntries();
+    }
+
+    @Override
+    public Collection<String> getUserNames() {
+        return Arrays.stream(this.cachedUsers).map(WebUser::getUsername).collect(Collectors.toList());
     }
 
     @Override

@@ -1,9 +1,17 @@
 package eu.cloudnetservice.cloudnet.repository;
 
+import de.dytanic.cloudnet.common.language.LanguageManager;
 import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
+import eu.cloudnetservice.cloudnet.repository.command.ConsoleCommandSender;
+import eu.cloudnetservice.cloudnet.repository.command.DefaultCommandMap;
+import eu.cloudnetservice.cloudnet.repository.command.ICommandMap;
+import eu.cloudnetservice.cloudnet.repository.command.defaults.CommandUser;
 import eu.cloudnetservice.cloudnet.repository.config.BasicConfiguration;
 import eu.cloudnetservice.cloudnet.repository.console.ConsoleLogHandler;
+import eu.cloudnetservice.cloudnet.repository.console.IConsole;
+import eu.cloudnetservice.cloudnet.repository.console.JLine2Console;
+import eu.cloudnetservice.cloudnet.repository.console.log.ColouredLogFormatter;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.H2Database;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
@@ -15,13 +23,6 @@ import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.WebServer;
-import io.javalin.Javalin;
-import io.javalin.plugin.openapi.OpenApiOptions;
-import io.javalin.plugin.openapi.OpenApiPlugin;
-import io.javalin.plugin.openapi.ui.SwaggerOptions;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.servers.Server;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.File;
@@ -34,6 +35,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
@@ -47,12 +49,19 @@ public class CloudNetUpdateServer {
 
     private Database database;
     private BasicConfiguration configuration;
-    private final ILogger logger;
 
-    private CloudNetUpdateServer() throws IOException {
+    private ICommandMap commandMap;
+
+    private final ILogger logger;
+    private final IConsole console;
+
+    private CloudNetUpdateServer() throws Exception {
         this.logger = new DefaultAsyncLogger();
+        this.console = new JLine2Console();
         this.logger.addLogHandler(new DefaultFileLogHandler(new File("logs"), "cloudnet.repo.log", 8000000L).setFormatter(new DefaultLogFormatter()));
-        this.logger.addLogHandler(new ConsoleLogHandler(System.out, System.err).setFormatter(new DefaultLogFormatter()));
+        this.logger.addLogHandler(new ConsoleLogHandler(this.console).setFormatter(new ColouredLogFormatter()));
+
+        this.initCommands();
 
         AnsiConsole.systemInstall();
 
@@ -73,11 +82,29 @@ public class CloudNetUpdateServer {
 
         this.moduleRepositoryProvider = new ModuleRepositoryProvider(this);
 
-          //TODO Add console commands (user list, user create, user delete)
-
         this.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopWithoutShutdown));
+    }
+
+    private void initCommands() {
+        this.commandMap = new DefaultCommandMap();
+        this.commandMap.registerCommand(new CommandUser(this));
+
+        this.console.addCommandHandler(UUID.randomUUID(), input -> {
+            try {
+                if (input.trim().isEmpty()) {
+                    return;
+                }
+
+                if (!this.commandMap.dispatchCommand(new ConsoleCommandSender(this.logger), input)) {
+                    this.logger.warning("Command not found!");
+                }
+
+            } catch (Throwable ex) {
+                ex.printStackTrace();
+            }
+        });
     }
 
     public void registerEndPoint(EndPoint endPoint) {
@@ -182,7 +209,7 @@ public class CloudNetUpdateServer {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
         new CloudNetUpdateServer();
     }
 
