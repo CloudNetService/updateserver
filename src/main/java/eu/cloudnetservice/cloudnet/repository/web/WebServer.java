@@ -457,7 +457,7 @@ public class WebServer {
                 depends,
                 conflicts,
                 parentVersion.getName(),
-                this.server.getCurrentLatestVersion(parentVersion.getName()).getName(),
+                null,
                 description,
                 website,
                 sourceUrl,
