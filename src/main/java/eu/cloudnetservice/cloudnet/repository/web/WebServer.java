@@ -274,6 +274,10 @@ public class WebServer {
         if (this.server.getDatabase().getFAQEntry(uniqueId) != null) {
             throw new BadRequestResponse("An FAQ entry with that id already exists");
         }
+        if (question == null || answer == null) {
+            throw new BadRequestResponse("Missing question or answer header");
+        }
+
         this.server.getDatabase().insertFAQEntry(new FAQEntry(
                 uniqueId,
                 language,
@@ -300,14 +304,21 @@ public class WebServer {
         if (entry == null) {
             throw new BadRequestResponse("FAQ entry with that ID not found");
         }
-        entry.setQuestion(question);
-        entry.setAnswer(answer);
+        if (question != null) {
+            entry.setQuestion(question);
+        }
+        if (answer != null) {
+            entry.setAnswer(answer);
+        }
         this.server.getDatabase().updateFAQEntry(entry);
 
         System.out.println("FAQEntry updated by " + context.basicAuthCredentials().getUsername());
     }
 
     private void deleteFAQEntry(CloudNetParentVersion parentVersion, Context context) {
+        if (context.header("X-Entry-ID") == null) {
+            throw new BadRequestResponse("Missing X-Entry-ID header");
+        }
         UUID uniqueId = UUID.fromString(Objects.requireNonNull(context.header("X-Entry-ID")));
 
         FAQEntry entry = this.server.getDatabase().getFAQEntry(uniqueId);
