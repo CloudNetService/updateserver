@@ -16,7 +16,6 @@ import io.javalin.http.*;
 import io.javalin.plugin.json.JavalinJson;
 import io.javalin.plugin.openapi.OpenApiOptions;
 import io.javalin.plugin.openapi.OpenApiPlugin;
-import io.javalin.plugin.openapi.annotations.NULL_CLASS;
 import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
 import io.javalin.plugin.openapi.dsl.OpenApiUpdater;
 import io.javalin.plugin.openapi.ui.SwaggerOptions;
@@ -355,8 +354,7 @@ public class WebServer {
                         document()
                                 .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules from the given group for a specific parent version"))
                                 .jsonArray("200", RepositoryModuleInfo.class)
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("No modules available for the group"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                         context -> {
                             Collection<RepositoryModuleInfo> moduleInfos = this.server.getModuleRepositoryProvider().getModuleInfos(context.pathParam("parent"), context.pathParam("group"));
@@ -370,8 +368,7 @@ public class WebServer {
                         document()
                                 .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the latest module from the given group with the given name for a specific parent version"))
                                 .json("200", RepositoryModuleInfo.class)
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Group and name combination not found"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                         context -> {
                             RepositoryModuleInfo moduleInfo = this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(
@@ -386,9 +383,9 @@ public class WebServer {
                 ));
                 get("/file/:group/:name", documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version"))
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
-                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Group and name combination not found"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Download the Jar of a module"))
+                                .result("200", null, "application/zip")
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                         context -> {
                             InputStream inputStream = this.server.getModuleRepositoryProvider().openLatestModuleStream(
