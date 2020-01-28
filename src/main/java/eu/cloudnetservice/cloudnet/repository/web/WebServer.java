@@ -14,13 +14,26 @@ import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEv
 import io.javalin.Javalin;
 import io.javalin.http.*;
 import io.javalin.plugin.json.JavalinJson;
+import io.javalin.plugin.openapi.OpenApiOptions;
+import io.javalin.plugin.openapi.OpenApiPlugin;
+import io.javalin.plugin.openapi.annotations.NULL_CLASS;
+import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
+import io.javalin.plugin.openapi.dsl.OpenApiUpdater;
+import io.javalin.plugin.openapi.ui.SwaggerOptions;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
+import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.document;
+import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.documented;
 
 public class WebServer {
 
@@ -30,8 +43,7 @@ public class WebServer {
     private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
     private CloudNetUpdateServer server;
 
-    public WebServer(Javalin javalin, CloudNetUpdateServer server) {
-        this.javalin = javalin;
+    public WebServer(CloudNetUpdateServer server) {
         this.server = server;
     }
 
@@ -48,15 +60,36 @@ public class WebServer {
     }
 
     public void init() {
+        this.javalin = Javalin.create(config -> {
+            config.enableWebjars();
+
+            OpenApiOptions options = new OpenApiOptions(() -> new OpenAPI()
+                    .info(new Info()
+                            .version("1.0")
+                            .description("CloudNet 2/3 UpdateServer API")
+                            .title("CloudNet Update"))
+                    .addServersItem(new Server().url("https://api.cloudnetservice.eu").description("CloudNetService")))
+                    .path("/api/swagger-docs")
+                    .ignorePath("/docs/*")
+                    .ignorePath("/versions/*")
+                    .ignorePath("/admin/*")
+                    .activateAnnotationScanningFor(this.getClass().getPackageName())
+                    .swagger(new SwaggerOptions("/api/docs").title("CloudNet Updates"));
+
+            for (CloudNetParentVersion parentVersion : this.server.getParentVersions()) {
+                options.ignorePath(parentVersion.getGitHubWebHookPath());
+            }
+
+            config.registerPlugin(new OpenApiPlugin(options));
+        });
+
         JavalinJson.setToJsonMapper(JsonDocument.GSON::toJson);
         JavalinJson.setFromJsonMapper(JsonDocument.GSON::fromJson);
 
         this.javalin.config.requestCacheSize = 16384L;
 
-        this.javalin.config.addStaticFiles("/web");
-
         this.javalin.config.accessManager((handler, ctx, permittedRoles) -> {
-            /*if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
+            if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
                 handler.handle(ctx);
                 return;
             }
@@ -80,32 +113,81 @@ public class WebServer {
             }
 
             ctx.header("User-Role", role.name());
-            ctx.header("User-Role-ID", String.valueOf(role.ordinal()));*/
+            ctx.header("User-Role-ID", String.valueOf(role.ordinal()));
 
             handler.handle(ctx);
         });
 
         // sometimes we can't use the Context#json methods to set the response because they don't accept null input
 
-        this.javalin.get("/api", context -> context.result("{\"available\":" + this.apiAvailable + "}"));
+        this.javalin.get("/api", documented(
+                document()
+                        .operation(operation -> {
+                            operation
+                                    .summary("Check if the API is available")
+                                    .operationId("apiAvailable");
+                        })
+                        .json("200", APIAvailableResponse.class),
+                (Handler) context -> context.json(new APIAvailableResponse(this.apiAvailable))
+        ));
 
         this.javalin.before("/api/*", context -> {
             if (!this.apiAvailable && !context.path().equalsIgnoreCase("/api/")) {
                 throw new InternalServerErrorResponse("API currently not available");
             }
         });
-        this.javalin.get("/api/parentVersions", context -> context.result(JsonDocument.GSON.toJson(this.server.getParentVersionNames())));
-        this.javalin.get("/api/versions", context -> context.result(JsonDocument.GSON.toJson(Arrays.stream(this.server.getDatabase().getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList()))));
-        this.javalin.get("/api/versions/:parent", context -> context.result(JsonDocument.GSON.toJson(Arrays.stream(this.server.getDatabase().getAllVersions(context.pathParam("parent"))).map(CloudNetVersion::getName).collect(Collectors.toList()))));
-        this.javalin.get("/api/versions/:parent/:version", context -> context.result(JsonDocument.GSON.toJson(this.server.getDatabase().getVersion(
-                context.pathParam("parent"),
-                this.getVersionOrLatest(context.pathParam("parent"), context.pathParam("version"))
-        ))));
+        this.javalin.get("/api/parentVersions", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all parent versions"))
+                        .jsonArray("200", String.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.result(JsonDocument.GSON.toJson(this.server.getParentVersionNames()))
+        ));
+        this.javalin.get("/api/versions", OpenApiBuilder.documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions"))
+                        .jsonArray("200", String.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.result(JsonDocument.GSON.toJson(Arrays.stream(this.server.getDatabase().getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())))
+        ));
+        this.javalin.get("/api/versions/:parent", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions available for a specific parent version"))
+                        .pathParam("parent", String.class, parameter -> parameter.description("The name of the parent version"))
+                        .jsonArray("200", CloudNetVersion.class)
+                        .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                context -> {
+                    if (this.server.getParentVersion(context.pathParam("parent")).isEmpty()) {
+                        context.status(404);
+                        return;
+                    }
+                    context.result(JsonDocument.GSON.toJson(Arrays.stream(this.server.getDatabase().getAllVersions(context.pathParam("parent"))).map(CloudNetVersion::getName).collect(Collectors.toList())));
+                }
+        ));
+        this.javalin.get("/api/versions/:parent/:version", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available information for a specific version"))
+                        .pathParam("parent", String.class, parameter -> parameter.description("The name of the parent version"))
+                        .pathParam("version", String.class, parameter -> parameter.description("The name of the version"))
+                        .json("200", CloudNetVersion.class)
+                        .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Version not found"))
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                context -> {
+                    CloudNetVersion version = this.server.getDatabase().getVersion(
+                            context.pathParam("parent"),
+                            this.getVersionOrLatest(context.pathParam("parent"), context.pathParam("version"))
+                    );
+                    context.status(version != null ? 200 : 404).result(JsonDocument.GSON.toJson(version));
+                }
+        ));
 
-        this.javalin.get("/api/languages", context -> context.result(
-                JsonDocument.newDocument()
-                        .append("availableLanguages", Arrays.asList("english", "german"))
-                        .toPrettyJson()
+        this.javalin.get("/api/languages", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages"))
+                        .jsonArray("200", String.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.json(Arrays.asList("english", "german")) //todo config
         ));
 
         for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {
@@ -114,11 +196,18 @@ public class WebServer {
             this.javalin.get("/versions/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "CloudNet.zip", this.server));
             this.javalin.get("/docs/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "index.html", this.server));
 
-            this.initFAQAPI(parentVersion);
-            this.initModuleAPI(parentVersion);
         }
 
-        this.javalin.get("/api/modules/list", context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos()));
+        this.initFAQAPI();
+        this.initModuleAPI();
+
+        this.javalin.get("/api/modules/list", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all modules"))
+                        .jsonArray("200", RepositoryModuleInfo.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos())
+        ));
         this.javalin.exception(ModuleInstallException.class, (exception, context) -> context.status(400).contentType("application/json").result(JsonDocument.newDocument()
                 .append("message", exception.getMessage())
                 .append("status", 400)
@@ -130,22 +219,45 @@ public class WebServer {
         this.javalin.start(this.server.getConfiguration().getWebPort());
     }
 
-    private void initFAQAPI(CloudNetParentVersion parentVersion) {
+    private void initFAQAPI() {
         this.javalin.routes(() -> {
-            path("/api/faq/" + parentVersion.getName(), () -> {
-                get(context -> context.json(this.server.getDatabase().getFAQEntries(parentVersion.getName())));
-                get("/:language", context -> context.json(
-                        Arrays.stream(this.server.getDatabase().getFAQEntries(parentVersion.getName()))
+            path("/api/:parent/faq", () -> {
+                before(context -> {
+                    if (this.server.getParentVersion(context.pathParam("parent")).isEmpty()) {
+                        throw new NotFoundResponse();
+                    }
+                });
+                get(documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        (Handler) context -> context.json(this.server.getDatabase().getFAQEntries(context.pathParam("parent")))
+                ));
+                get("/:language", documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation
+                                        .summary("Get a list of all available faq entries for the specific parent version and language")
+                                )
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        (Handler) context -> context.json(Arrays.stream(this.server.getDatabase().getFAQEntries(context.pathParam("parent")))
                                 .filter(entry -> entry.getLanguage().equalsIgnoreCase(context.pathParam("language")))
-                                .toArray()
+                                .toArray(FAQEntry[]::new)
+                        )
                 ));
             });
 
-            path("/admin/api/faq/" + parentVersion.getName(), () -> {
+            path("/admin/api/faq/:parent", () -> {
                 //todo fix "Ã¼" -> "ö"
-                post(context -> this.addFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
-                patch(context -> this.updateFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
-                delete(context -> this.deleteFAQEntry(parentVersion, context), Set.of(WebPermissionRole.MODERATOR));
+                before(context -> {
+                    if (this.server.getParentVersion(context.pathParam("parent")).isEmpty()) {
+                        throw new NotFoundResponse();
+                    }
+                });
+                post(context -> this.addFAQEntry(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context), Set.of(WebPermissionRole.MODERATOR));
+                patch(context -> this.updateFAQEntry(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context), Set.of(WebPermissionRole.MODERATOR));
+                delete(context -> this.deleteFAQEntry(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context), Set.of(WebPermissionRole.MODERATOR));
             });
         });
     }
@@ -208,34 +320,90 @@ public class WebServer {
         System.out.println("FAQEntry deleted by " + context.basicAuthCredentials().getUsername());
     }
 
-    private void initModuleAPI(CloudNetParentVersion parentVersion) {
+    private void initModuleAPI() {
         this.javalin.routes(() -> {
-            path("/api/" + parentVersion.getName() + "/modules", () -> {
-                get("/list", context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName())));
-                get("/list/:group",
-                        context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName(), context.pathParam("group")))
-                );
-                get("/list/:group/:name",
-                        context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(parentVersion.getName(), context.pathParam("group"), context.pathParam("name")))
-                );
-                get("/file/:group/:name",
-                        context -> context.contentType("application/zip").result(this.server.getModuleRepositoryProvider().openLatestModuleStream(
-                                parentVersion.getName(),
-                                new ModuleId(context.pathParam("group"), context.pathParam("name"))
-                        ))
-                );
-                get("/file/:group/:name/:version",
-                        context -> context.contentType("application/zip").result(this.server.getModuleRepositoryProvider().openModuleStream(
-                                parentVersion.getName(),
-                                new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"))
-                        ))
-                );
+            path("/api/:parent/modules", () -> {
+                before(context -> {
+                    if (this.server.getParentVersion(context.pathParam("parent")).isEmpty()) {
+                        throw new NotFoundResponse();
+                    }
+                });
+                get("/list", documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules for a specific parent version"))
+                                .jsonArray("200", RepositoryModuleInfo.class)
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        (Handler) context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos(context.pathParam("parent")))
+                ));
+                get("/list/:group", documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules from the given group for a specific parent version"))
+                                .jsonArray("200", RepositoryModuleInfo.class)
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("No modules available for the group"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        context -> {
+                            Collection<RepositoryModuleInfo> moduleInfos = this.server.getModuleRepositoryProvider().getModuleInfos(context.pathParam("parent"), context.pathParam("group"));
+                            if (moduleInfos.isEmpty()) {
+                                context.status(404);
+                            }
+                            context.json(moduleInfos);
+                        }
+                ));
+                get("/latest/:group/:name", documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the latest module from the given group with the given name for a specific parent version"))
+                                .json("200", RepositoryModuleInfo.class)
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Group and name combination not found"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        context -> {
+                            RepositoryModuleInfo moduleInfo = this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(
+                                    context.pathParam("parent"),
+                                    new ModuleId(context.pathParam("group"), context.pathParam("name"))
+                            );
+                            if (moduleInfo == null) {
+                                context.status(404);
+                            }
+                            context.json(moduleInfo);
+                        }
+                ));
+                get("/file/:group/:name", documented(
+                        document()
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
+                                .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Group and name combination not found"))
+                                .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                        context -> {
+                            InputStream inputStream = this.server.getModuleRepositoryProvider().openLatestModuleStream(
+                                    context.pathParam("parent"),
+                                    new ModuleId(context.pathParam("group"), context.pathParam("name"))
+                            );
+                            if (inputStream == null) {
+                                context.status(404);
+                            } else {
+                                context.contentType("application/zip").result(inputStream);
+                            }
+                        }
+                ));
             });
 
-            path("/admin/api/" + parentVersion.getName() + "/modules", () -> {
-                path("/:group/:name/:version", () -> {
-                    post(context -> this.addVersion(parentVersion, context));
-                    patch(context -> this.updateVersion(parentVersion, context));
+            path("/admin/api/:parent/modules", () -> {
+                path("/:group/:name", () -> {
+                    path(":version", () -> {
+                        post(context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
+                        patch(context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
+                    });
+                    delete(context -> {
+                        String parentVersionName = context.pathParam(":parent");
+                        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
+                        if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
+                            context.status(404);
+                            return;
+                        }
+                        this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
+                    });
                 });
             });
         });

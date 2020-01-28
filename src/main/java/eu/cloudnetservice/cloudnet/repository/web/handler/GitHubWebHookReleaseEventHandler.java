@@ -10,6 +10,7 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
 import io.javalin.http.Handler;
+import io.javalin.plugin.openapi.annotations.OpenApi;
 import org.apache.commons.codec.DecoderException;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,6 +27,7 @@ public class GitHubWebHookReleaseEventHandler implements Handler {
         this.parentVersion = parentVersion;
     }
 
+    @OpenApi(ignore = true)
     @Override
     public void handle(@NotNull Context context) throws Exception {
         var hubSignature = context.header("X-Hub-Signature");

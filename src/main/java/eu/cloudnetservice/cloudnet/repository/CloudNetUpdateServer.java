@@ -16,6 +16,12 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.WebServer;
 import io.javalin.Javalin;
+import io.javalin.plugin.openapi.OpenApiOptions;
+import io.javalin.plugin.openapi.OpenApiPlugin;
+import io.javalin.plugin.openapi.ui.SwaggerOptions;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.File;
@@ -63,7 +69,7 @@ public class CloudNetUpdateServer {
         CloudNetVersionFileLoader versionFileLoader = new JenkinsCloudNetVersionFileLoader();
         this.releaseArchiver = new ReleaseArchiver(versionFileLoader);
 
-        this.webServer = new WebServer(Javalin.create(), this);
+        this.webServer = new WebServer(this);
 
         this.moduleRepositoryProvider = new ModuleRepositoryProvider(this);
 

@@ -71,7 +71,7 @@ public interface Database extends Closeable {
 
     void removeModuleInfo(RepositoryModuleInfo moduleInfo);
 
-    void removeModuleInfo(ModuleId moduleId);
+    void removeModuleInfo(String parentVersionName, ModuleId moduleId);
 
     RepositoryModuleInfo[] getModuleInfos();
 

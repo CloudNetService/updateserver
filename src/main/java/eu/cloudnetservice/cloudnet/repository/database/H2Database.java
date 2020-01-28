@@ -45,7 +45,7 @@ public class H2Database implements Database {
             this.executeUpdate("CREATE TABLE IF NOT EXISTS versions (name VARCHAR(128), content TEXT)");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS faq (uniqueId BINARY(16), content TEXT)");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS users (username VARCHAR(128), password TEXT, role VARCHAR(32))");
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128), content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128), parentVersionName VARCHAR(32), content TEXT)");
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
@@ -269,10 +269,11 @@ public class H2Database implements Database {
     @Override
     public void insertModuleInfo(RepositoryModuleInfo moduleInfo) {
         this.executeUpdate(
-                "INSERT INTO modules (moduleId, content) VALUES (?, ?)",
+                "INSERT INTO modules (moduleId, parentVersionName, content) VALUES (?, ?, ?)",
                 preparedStatement -> {
                     preparedStatement.setString(1, moduleInfo.getModuleId().ignoreVersion().toString());
-                    preparedStatement.setString(2, this.gson.toJson(moduleInfo));
+                    preparedStatement.setString(2, moduleInfo.getParentVersionName());
+                    preparedStatement.setString(3, this.gson.toJson(moduleInfo));
                 }
         );
         this.cacheModules();
@@ -281,10 +282,11 @@ public class H2Database implements Database {
     @Override
     public void updateModuleInfo(RepositoryModuleInfo moduleInfo) {
         this.executeUpdate(
-                "UPDATE modules SET content = ? WHERE moduleId = ?",
+                "UPDATE modules SET content = ?, parentVersionName = ? WHERE moduleId = ?",
                 preparedStatement -> {
                     preparedStatement.setString(1, this.gson.toJson(moduleInfo));
-                    preparedStatement.setString(2, moduleInfo.getModuleId().ignoreVersion().toString());
+                    preparedStatement.setString(2, moduleInfo.getParentVersionName());
+                    preparedStatement.setString(3, moduleInfo.getModuleId().ignoreVersion().toString());
                 }
         );
         this.cacheModules();
@@ -292,12 +294,15 @@ public class H2Database implements Database {
 
     @Override
     public void removeModuleInfo(RepositoryModuleInfo moduleInfo) {
-        this.removeModuleInfo(moduleInfo.getModuleId());
+        this.removeModuleInfo(moduleInfo.getParentVersionName(), moduleInfo.getModuleId());
     }
 
     @Override
-    public void removeModuleInfo(ModuleId moduleId) {
-        this.executeUpdate("DELETE FROM modules WHERE moduleId = ?", preparedStatement -> preparedStatement.setString(1, moduleId.ignoreVersion().toString()));
+    public void removeModuleInfo(String parentVersionName, ModuleId moduleId) {
+        this.executeUpdate("DELETE FROM modules WHERE moduleId = ? AND parentVersionName = ?", preparedStatement -> {
+            preparedStatement.setString(1, moduleId.ignoreVersion().toString());
+            preparedStatement.setString(2, parentVersionName);
+        });
         this.cacheModules();
     }
 

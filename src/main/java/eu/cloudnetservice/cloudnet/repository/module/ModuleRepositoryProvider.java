@@ -89,7 +89,7 @@ public class ModuleRepositoryProvider {
             throw new ModuleInstallException("Module not found");
         }
 
-        this.removeModule(oldModuleInfo.getModuleId());
+        this.removeModule(oldModuleInfo.getParentVersionName(), oldModuleInfo.getModuleId());
         this.server.getDatabase().insertModuleInfo(moduleInfo);
     }
 
@@ -139,22 +139,24 @@ public class ModuleRepositoryProvider {
         }
     }
 
-    public void removeModule(ModuleId moduleId) {
-        this.server.getDatabase().removeModuleInfo(moduleId);
+    public void removeModule(String parentVersionName, ModuleId moduleId) {
+        this.server.getDatabase().removeModuleInfo(parentVersionName, moduleId);
     }
 
     public InputStream openLatestModuleStream(String parentVersionName, ModuleId moduleId) throws IOException {
         if (moduleId == null) {
             return null;
         }
-        return Files.newInputStream(this.getLatestPath(parentVersionName, moduleId));
+        Path path = this.getLatestPath(parentVersionName, moduleId);
+        return Files.exists(path) ? Files.newInputStream(path) : null;
     }
 
     public InputStream openModuleStream(String parentVersionName, ModuleId moduleId) throws IOException {
         if (moduleId == null) {
             return null;
         }
-        return Files.newInputStream(this.getPath(parentVersionName, moduleId));
+        Path path = this.getPath(parentVersionName, moduleId);
+        return Files.exists(path) ? Files.newInputStream(path) : null;
     }
 
     public Path getModuleDirectory(String parentVersionName, ModuleId moduleId) {
