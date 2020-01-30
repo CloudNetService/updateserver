@@ -80,12 +80,13 @@ public class WebServer {
             }
 
             config.registerPlugin(new OpenApiPlugin(options));
+
+            config.enableCorsForAllOrigins();
+            config.requestCacheSize = 16384L;
         });
 
         JavalinJson.setToJsonMapper(JsonDocument.GSON::toJson);
         JavalinJson.setFromJsonMapper(JsonDocument.GSON::fromJson);
-
-        this.javalin.config.requestCacheSize = 16384L;
 
         this.javalin.config.accessManager((handler, ctx, permittedRoles) -> {
             if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
