@@ -67,7 +67,7 @@ public class WebServer {
                             .version("1.0")
                             .description("CloudNet 2/3 UpdateServer API")
                             .title("CloudNet Update"))
-                    .addServersItem(new Server().url("https://api.cloudnetservice.eu").description("CloudNetService")))
+                    .addServersItem(new Server().url("https://update.cloudnetservice.eu").description("CloudNetService")))
                     .path("/api/swagger-docs")
                     .ignorePath("/docs/*")
                     .ignorePath("/versions/*")
@@ -143,7 +143,7 @@ public class WebServer {
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) context -> context.result(JsonDocument.GSON.toJson(this.server.getParentVersionNames()))
         ));
-        this.javalin.get("/api/versions", OpenApiBuilder.documented(
+        this.javalin.get("/api/versions", documented(
                 document()
                         .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions"))
                         .jsonArray("200", String.class)
@@ -316,7 +316,7 @@ public class WebServer {
         }
         this.server.getDatabase().updateFAQEntry(entry);
 
-        System.out.println("FAQEntry updated by " + context.basicAuthCredentials().getUsername());
+        System.out.println("FAQEntry " + uniqueId + " updated by " + context.basicAuthCredentials().getUsername());
     }
 
     private void deleteFAQEntry(CloudNetParentVersion parentVersion, Context context) {
@@ -332,7 +332,7 @@ public class WebServer {
 
         this.server.getDatabase().deleteFAQEntry(entry.getUniqueId());
 
-        System.out.println("FAQEntry deleted by " + context.basicAuthCredentials().getUsername());
+        System.out.println("FAQEntry " + uniqueId + " deleted by " + context.basicAuthCredentials().getUsername());
     }
 
     private void initModuleAPI() {
