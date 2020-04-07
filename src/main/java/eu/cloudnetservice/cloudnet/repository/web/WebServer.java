@@ -188,7 +188,7 @@ public class WebServer {
                         .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages"))
                         .jsonArray("200", String.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
-                (Handler) context -> context.json(Arrays.asList("english", "german")) //todo config
+                (Handler) context -> context.json(this.server.getConfiguration().getAvailableLanguages())
         ));
 
         for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {

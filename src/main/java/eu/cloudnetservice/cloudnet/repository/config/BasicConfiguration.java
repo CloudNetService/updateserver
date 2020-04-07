@@ -6,10 +6,8 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersionFile;
 import eu.cloudnetservice.cloudnet.repository.version.VersionFileMappings;
 
-import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -19,10 +17,15 @@ public class BasicConfiguration {
     private static final Path CONFIG_PATH = Paths.get("config.json");
 
     private int webPort;
+    private String[] availableLanguages;
     private Collection<CloudNetParentVersion> parentVersions;
 
     public int getWebPort() {
         return this.webPort;
+    }
+
+    public String[] getAvailableLanguages() {
+        return this.availableLanguages;
     }
 
     public Collection<CloudNetParentVersion> getParentVersions() {
@@ -34,6 +37,7 @@ public class BasicConfiguration {
         document.read(CONFIG_PATH);
 
         this.webPort = document.getInt("webPort", 1430);
+        this.availableLanguages = document.get("availableLanguages", String[].class);
         this.parentVersions = document.get("parentVersions", TypeToken.getParameterized(Collection.class, CloudNetParentVersion.class).getType(),
                 Collections.singletonList(
                         new CloudNetParentVersion(
