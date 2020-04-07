@@ -13,7 +13,7 @@ import eu.cloudnetservice.cloudnet.repository.console.JLine2Console;
 import eu.cloudnetservice.cloudnet.repository.console.log.ColouredLogFormatter;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.H2Database;
-import eu.cloudnetservice.cloudnet.repository.database.StatisticsManager;
+import eu.cloudnetservice.cloudnet.repository.database.statistics.StatisticsManager;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
@@ -159,7 +159,6 @@ public class CloudNetUpdateServer {
             System.err.println("Failed to initialize the database");
             return;
         }
-        this.statisticsManager.init(this.executorService);
 
         for (EndPoint endPoint : this.endPoints) {
             Path configPath = Paths.get("endPoints", endPoint.getName() + ".json");
@@ -173,6 +172,8 @@ public class CloudNetUpdateServer {
         }
 
         this.webServer.init();
+
+        this.statisticsManager.init(this.executorService, this.webServer.getJavalin());
 
         this.repositories = new ArrayList<>();
         for (CloudNetParentVersion parentVersion : this.getParentVersions()) {

@@ -3,7 +3,6 @@ package eu.cloudnetservice.cloudnet.repository.web;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.Constants;
-import eu.cloudnetservice.cloudnet.repository.database.Statistics;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleInstallException;
@@ -17,7 +16,6 @@ import io.javalin.http.*;
 import io.javalin.plugin.json.JavalinJson;
 import io.javalin.plugin.openapi.OpenApiOptions;
 import io.javalin.plugin.openapi.OpenApiPlugin;
-import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
 import io.javalin.plugin.openapi.dsl.OpenApiUpdater;
 import io.javalin.plugin.openapi.ui.SwaggerOptions;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -40,10 +38,10 @@ public class WebServer {
 
     private static final String SUCCESS_JSON = JsonDocument.newDocument("success", true).toPrettyJson();
 
-    private static final String GENERAL_TAG = "General";
-    private static final String VERSIONS_TAG = "Versions";
-    private static final String FAQ_TAG = "FAQ";
-    private static final String MODULES_TAG = "Modules";
+    public static final String GENERAL_TAG = "General";
+    public static final String VERSIONS_TAG = "Versions";
+    public static final String FAQ_TAG = "FAQ";
+    public static final String MODULES_TAG = "Modules";
 
     private Javalin javalin;
     private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
@@ -79,6 +77,7 @@ public class WebServer {
                     .ignorePath("/docs/*")
                     .ignorePath("/versions/*")
                     .ignorePath("/admin/*")
+                    .ignorePath("/internal/*")
                     .activateAnnotationScanningFor(this.getClass().getPackageName())
                     .swagger(new SwaggerOptions("/api/docs").title("CloudNet Updates"));
 
@@ -151,13 +150,6 @@ public class WebServer {
                         .jsonArray("200", String.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) context -> context.json(this.server.getConfiguration().getAvailableLanguages())
-        ));
-        this.javalin.get("/api/statistics", documented(
-                document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the global statistics of CloudNet").addTagsItem(GENERAL_TAG))
-                        .json("200", Statistics.class)
-                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
-                (Handler) ctx -> ctx.json(this.server.getStatisticsManager().getStatistics())
         ));
 
         for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {
