@@ -23,6 +23,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -36,6 +37,13 @@ public class ReleaseArchiver {
 
     public ReleaseArchiver(CloudNetVersionFileLoader versionFileLoader) {
         this.versionFileLoader = versionFileLoader;
+    }
+
+    public InputStream openFileStream(CloudNetVersion version, CloudNetVersionFile file) throws IOException {
+        if (file.getFileType() == CloudNetVersionFile.FileType.JAVA_DOCS) {
+            return null;
+        }
+        return Files.newInputStream(this.resolveDefaultDirectory(version.getParentVersionName(), version.getName()).resolve(file.getName()));
     }
 
     public CloudNetVersion installLatestRelease(CloudNetParentVersion parentVersion) throws IOException, CloudNetVersionLoadException, CloudNetVersionInstallException {
@@ -93,7 +101,7 @@ public class ReleaseArchiver {
     }
 
     private void archiveFiles(String parentVersionName, String cloudNetVersion, CloudNetVersionFile[] versionFiles) throws IOException {
-        var directory = Constants.VERSIONS_DIRECTORY.resolve(parentVersionName).resolve(cloudNetVersion);
+        var directory = this.resolveDefaultDirectory(parentVersionName, cloudNetVersion);
 
         if (Files.exists(directory)) {
             FileUtils.delete(directory.toFile());
@@ -162,4 +170,7 @@ public class ReleaseArchiver {
         }
     }
 
+    private Path resolveDefaultDirectory(String parentVersionName, String versionName) {
+        return Constants.VERSIONS_DIRECTORY.resolve(parentVersionName).resolve(versionName);
+    }
 }

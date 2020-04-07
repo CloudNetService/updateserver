@@ -20,6 +20,7 @@ import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileL
 import eu.cloudnetservice.cloudnet.repository.module.ModuleRepositoryProvider;
 import eu.cloudnetservice.cloudnet.repository.endpoint.EndPoint;
 import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
+import eu.cloudnetservice.cloudnet.repository.repository.CloudNetUpdateRepository;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import eu.cloudnetservice.cloudnet.repository.web.WebServer;
@@ -32,10 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
@@ -51,6 +49,8 @@ public class CloudNetUpdateServer {
     private BasicConfiguration configuration;
 
     private ICommandMap commandMap;
+
+    private Collection<CloudNetUpdateRepository> repositories = Collections.emptyList();
 
     private final ILogger logger;
     private final IConsole console;
@@ -162,6 +162,14 @@ public class CloudNetUpdateServer {
         }
 
         this.webServer.init();
+
+        this.repositories = new ArrayList<>();
+        for (CloudNetParentVersion parentVersion : this.getParentVersions()) {
+            CloudNetUpdateRepository repository = new CloudNetUpdateRepository(parentVersion.getName(), this.database, this.releaseArchiver);
+            repository.init(parentVersion.getUpdateRepositoryPath(), this.webServer.getJavalin());
+            repository.installVersion(this.getCurrentLatestVersion(parentVersion.getName()));
+            this.repositories.add(repository);
+        }
     }
 
     public void stop() {
@@ -206,6 +214,11 @@ public class CloudNetUpdateServer {
     private void invokeReleasePublished(CloudNetParentVersion parentVersion, CloudNetVersion version) {
         for (EndPoint endPoint : this.endPoints) {
             endPoint.publishRelease(parentVersion, version);
+        }
+        for (CloudNetUpdateRepository repository : this.repositories) {
+            if (repository.getTargetParentVersion().equals(parentVersion.getName())) {
+                repository.installVersion(version);
+            }
         }
     }
 

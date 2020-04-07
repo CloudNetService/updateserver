@@ -42,4 +42,12 @@ public class GitHubCommitInfo {
     public int getCommentCount() {
         return this.commentCount;
     }
+
+    public String fetchCommitHash() {
+        int lastSeparator = this.url.lastIndexOf('/');
+        if (lastSeparator == -1 || lastSeparator == this.url.length() - 1) {
+            return null;
+        }
+        return this.url.substring(lastSeparator + 1);
+    }
 }

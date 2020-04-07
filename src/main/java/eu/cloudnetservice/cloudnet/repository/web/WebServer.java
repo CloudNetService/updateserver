@@ -34,6 +34,7 @@ import static io.javalin.apibuilder.ApiBuilder.*;
 import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.document;
 import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.documented;
 
+// todo some documentation entries have no 200 response
 public class WebServer {
 
     private static final String SUCCESS_JSON = JsonDocument.newDocument("success", true).toPrettyJson();

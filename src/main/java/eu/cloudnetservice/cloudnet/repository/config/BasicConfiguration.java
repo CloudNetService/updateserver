@@ -39,6 +39,7 @@ public class BasicConfiguration {
                         new CloudNetParentVersion(
                                 "v3",
                                 "de.dytanic.cloudnet",
+                                "/updates/v3",
                                 "https://ci.cloudnetservice.eu/job/CloudNetService/job/CloudNet-v3/job/master/",
                                 "https://api.github.com/repos/CloudNetService/CloudNet-v3/",
                                 "123",

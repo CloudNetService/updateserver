@@ -10,21 +10,28 @@ public class CloudNetParentVersion {
 
     private String name;
     private String mavenGroupId;
+
+    private String updateRepositoryPath;
+
     private String jenkinsBaseURL;
+
     private String gitHubApiURL;
     private String gitHubSecret;
     private String gitHubWebHookPath;
-    private Collection<CloudNetVersionFileInfo> additionalVersionFiles;
-    private String moduleFileName;
-    private Map<String, Object> properties;
 
+    private Collection<CloudNetVersionFileInfo> additionalVersionFiles;
+
+    private String moduleFileName;
+
+    private Map<String, Object> properties;
     private VersionFileMappings defaultVersionFileMappings;
 
-    public CloudNetParentVersion(String name, String mavenGroupId, String jenkinsBaseURL, String gitHubApiURL,
+    public CloudNetParentVersion(String name, String mavenGroupId, String updateRepositoryPath, String jenkinsBaseURL, String gitHubApiURL,
                                  String gitHubSecret, String gitHubWebHookPath, Collection<CloudNetVersionFileInfo> additionalVersionFiles,
                                  String moduleFileName, VersionFileMappings defaultVersionFileMappings) {
         this.name = name;
         this.mavenGroupId = mavenGroupId;
+        this.updateRepositoryPath = updateRepositoryPath;
         this.jenkinsBaseURL = jenkinsBaseURL;
         this.gitHubApiURL = gitHubApiURL;
         this.gitHubSecret = gitHubSecret;
@@ -41,6 +48,10 @@ public class CloudNetParentVersion {
 
     public String getMavenGroupId() {
         return this.mavenGroupId;
+    }
+
+    public String getUpdateRepositoryPath() {
+        return this.updateRepositoryPath;
     }
 
     public String getJenkinsBaseURL() {
