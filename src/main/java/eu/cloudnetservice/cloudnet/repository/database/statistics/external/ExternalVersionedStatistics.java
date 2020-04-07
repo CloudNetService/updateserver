@@ -23,4 +23,28 @@ public class ExternalVersionedStatistics {
         this.operatingSystem = operatingSystem;
         this.countries = countries;
     }
+
+    public long getDownloads() {
+        return this.downloads;
+    }
+
+    public Map<String, Long> getCloudNetVersions() {
+        return this.cloudNetVersions;
+    }
+
+    public Map<ServerVersion, Integer> getServerVersions() {
+        return this.serverVersions;
+    }
+
+    public Map<JavaVersion, Long> getJavaVersions() {
+        return this.javaVersions;
+    }
+
+    public Map<OperatingSystem, Long> getOperatingSystem() {
+        return this.operatingSystem;
+    }
+
+    public Map<String, Long> getCountries() {
+        return this.countries;
+    }
 }
