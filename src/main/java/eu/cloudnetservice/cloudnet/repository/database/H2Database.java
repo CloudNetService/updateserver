@@ -2,6 +2,7 @@ package eu.cloudnetservice.cloudnet.repository.database;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
 import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
@@ -47,6 +48,7 @@ public class H2Database implements Database {
             this.executeUpdate("CREATE TABLE IF NOT EXISTS faq (uniqueId BINARY(16), content TEXT)");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS users (username VARCHAR(128), password TEXT, role VARCHAR(32))");
             this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128), parentVersionName VARCHAR(32), content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS extras (key VARCHAR(128), content TEXT)");
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
@@ -315,6 +317,26 @@ public class H2Database implements Database {
     @Override
     public RepositoryModuleInfo[] getModuleInfos() {
         return this.cachedModules;
+    }
+
+    @Override
+    public JsonDocument getStatistics() {
+        try (PreparedStatement statement = this.connection.prepareStatement("SELECT content FROM extras WHERE `key` = 'statistics'");
+             ResultSet resultSet = statement.executeQuery()) {
+            if (resultSet.next()) {
+                return JsonDocument.newDocument(resultSet.getString("content"));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        JsonDocument document = JsonDocument.newDocument(new Statistics());
+        this.executeUpdate("INSERT INTO extras (`key`, `content`) VALUES ('statistics', ?)", preparedStatement -> preparedStatement.setString(1, document.toJson()));
+        return document;
+    }
+
+    @Override
+    public void updateStatistics(JsonDocument document) {
+        this.executeUpdate("UPDATE extras SET content = ? WHERE `key` = 'statistics'", preparedStatement -> preparedStatement.setString(1, document.toJson()));
     }
 
     private byte[] uuidToBytes(UUID uuid) {

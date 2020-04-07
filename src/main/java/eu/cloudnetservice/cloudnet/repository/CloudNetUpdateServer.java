@@ -1,6 +1,5 @@
 package eu.cloudnetservice.cloudnet.repository;
 
-import de.dytanic.cloudnet.common.language.LanguageManager;
 import de.dytanic.cloudnet.common.logging.*;
 import eu.cloudnetservice.cloudnet.repository.archiver.ReleaseArchiver;
 import eu.cloudnetservice.cloudnet.repository.command.ConsoleCommandSender;
@@ -14,6 +13,7 @@ import eu.cloudnetservice.cloudnet.repository.console.JLine2Console;
 import eu.cloudnetservice.cloudnet.repository.console.log.ColouredLogFormatter;
 import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.H2Database;
+import eu.cloudnetservice.cloudnet.repository.database.StatisticsManager;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.loader.CloudNetVersionFileLoader;
 import eu.cloudnetservice.cloudnet.repository.loader.JenkinsCloudNetVersionFileLoader;
@@ -34,6 +34,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class CloudNetUpdateServer {
@@ -45,6 +47,7 @@ public class CloudNetUpdateServer {
 
     private Collection<EndPoint> endPoints = new ArrayList<>();
 
+    private StatisticsManager statisticsManager;
     private Database database;
     private BasicConfiguration configuration;
 
@@ -54,6 +57,7 @@ public class CloudNetUpdateServer {
 
     private final ILogger logger;
     private final IConsole console;
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
 
     private CloudNetUpdateServer() throws Exception {
         this.logger = new DefaultAsyncLogger();
@@ -72,6 +76,7 @@ public class CloudNetUpdateServer {
         this.configuration.load();
 
         this.database = new H2Database(Paths.get("database"));
+        this.statisticsManager = new StatisticsManager(this.database);
 
         this.registerEndPoint(new DiscordEndPoint());
 
@@ -124,6 +129,10 @@ public class CloudNetUpdateServer {
         return this.database;
     }
 
+    public StatisticsManager getStatisticsManager() {
+        return this.statisticsManager;
+    }
+
     public BasicConfiguration getConfiguration() {
         return this.configuration;
     }
@@ -150,6 +159,7 @@ public class CloudNetUpdateServer {
             System.err.println("Failed to initialize the database");
             return;
         }
+        this.statisticsManager.init(this.executorService);
 
         for (EndPoint endPoint : this.endPoints) {
             Path configPath = Paths.get("endPoints", endPoint.getName() + ".json");
@@ -170,6 +180,8 @@ public class CloudNetUpdateServer {
             repository.init(parentVersion.getUpdateRepositoryPath(), this.webServer.getJavalin());
             repository.installVersion(this.getCurrentLatestVersion(parentVersion.getName()));
             this.repositories.add(repository);
+
+            this.statisticsManager.getStatistics().registerVersion(parentVersion.getName());
         }
     }
 
@@ -179,6 +191,8 @@ public class CloudNetUpdateServer {
     }
 
     private void stopWithoutShutdown() {
+        this.statisticsManager.save();
+
         try {
             this.database.close();
             this.webServer.stop();

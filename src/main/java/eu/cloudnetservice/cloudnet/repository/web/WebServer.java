@@ -3,6 +3,7 @@ package eu.cloudnetservice.cloudnet.repository.web;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.Constants;
+import eu.cloudnetservice.cloudnet.repository.database.Statistics;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleInstallException;
@@ -126,6 +127,7 @@ public class WebServer {
 
         // sometimes we can't use the Context#json methods to set the response because they don't accept null input
 
+        this.javalin.get("/admin/api", context -> context.result("{}"), Set.of(WebPermissionRole.MEMBER));
         this.javalin.get("/api", documented(
                 document()
                         .operation(operation -> {
@@ -143,6 +145,37 @@ public class WebServer {
                 throw new InternalServerErrorResponse("API currently not available");
             }
         });
+        this.javalin.get("/api/languages", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages").addTagsItem(GENERAL_TAG))
+                        .jsonArray("200", String.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.json(this.server.getConfiguration().getAvailableLanguages())
+        ));
+        this.javalin.get("/api/statistics", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the global statistics of CloudNet").addTagsItem(GENERAL_TAG))
+                        .json("200", Statistics.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) ctx -> ctx.json(this.server.getStatisticsManager().getStatistics())
+        ));
+
+        for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {
+            this.javalin.post(parentVersion.getGitHubWebHookPath(), new GitHubWebHookReleaseEventHandler(this.server, parentVersion));
+
+            this.javalin.get("/versions/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "CloudNet.zip", this.server));
+            this.javalin.get("/docs/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "index.html", this.server));
+
+        }
+
+        this.initVersionsAPI();
+        this.initFAQAPI();
+        this.initModuleAPI();
+
+        this.javalin.start(this.server.getConfiguration().getWebPort());
+    }
+
+    private void initVersionsAPI() {
         this.javalin.get("/api/parentVersions", documented(
                 document()
                         .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all parent versions").addTagsItem(VERSIONS_TAG))
@@ -188,29 +221,6 @@ public class WebServer {
                     context.status(version != null ? 200 : 404).result(JsonDocument.GSON.toJson(version));
                 }
         ));
-
-        this.javalin.get("/api/languages", documented(
-                document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages").addTagsItem(GENERAL_TAG))
-                        .jsonArray("200", String.class)
-                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
-                (Handler) context -> context.json(this.server.getConfiguration().getAvailableLanguages())
-        ));
-
-        for (CloudNetParentVersion parentVersion : this.server.getConfiguration().getParentVersions()) {
-            this.javalin.post(parentVersion.getGitHubWebHookPath(), new GitHubWebHookReleaseEventHandler(this.server, parentVersion));
-
-            this.javalin.get("/versions/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.VERSIONS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "CloudNet.zip", this.server));
-            this.javalin.get("/docs/" + parentVersion.getName() + "/:version/*", new ArchivedVersionHandler(Constants.DOCS_DIRECTORY.resolve(parentVersion.getName()), parentVersion, "index.html", this.server));
-
-        }
-
-        this.initFAQAPI();
-        this.initModuleAPI();
-
-        this.javalin.get("/admin/api", context -> context.result("{}"), Set.of(WebPermissionRole.MEMBER));
-
-        this.javalin.start(this.server.getConfiguration().getWebPort());
     }
 
     private void initFAQAPI() {

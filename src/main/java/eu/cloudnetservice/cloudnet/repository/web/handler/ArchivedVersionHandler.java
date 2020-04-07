@@ -63,5 +63,6 @@ public class ArchivedVersionHandler implements Handler {
         }
 
         context.status(202).contentType(MimeTypes.getTypeFromPath(file)).result(Files.newInputStream(file));
+        this.updateServer.getStatisticsManager().increaseDownloads(this.parentVersion.getName());
     }
 }

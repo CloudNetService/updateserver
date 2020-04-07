@@ -1,5 +1,6 @@
 package eu.cloudnetservice.cloudnet.repository.database;
 
+import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
@@ -77,5 +78,9 @@ public interface Database extends Closeable {
     void removeModuleInfo(String parentVersionName, ModuleId moduleId);
 
     RepositoryModuleInfo[] getModuleInfos();
+
+    JsonDocument getStatistics();
+
+    void updateStatistics(JsonDocument document);
 
 }
