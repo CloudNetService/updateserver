@@ -39,6 +39,11 @@ public class WebServer {
 
     private static final String SUCCESS_JSON = JsonDocument.newDocument("success", true).toPrettyJson();
 
+    private static final String GENERAL_TAG = "General";
+    private static final String VERSIONS_TAG = "Versions";
+    private static final String FAQ_TAG = "FAQ";
+    private static final String MODULES_TAG = "Modules";
+
     private Javalin javalin;
     private boolean apiAvailable = System.getProperty("cloudnet.repository.api.enabled", "true").equalsIgnoreCase("true");
     private CloudNetUpdateServer server;
@@ -126,6 +131,7 @@ public class WebServer {
                         .operation(operation -> {
                             operation
                                     .summary("Check if the API is available")
+                                    .addTagsItem(GENERAL_TAG)
                                     .operationId("apiAvailable");
                         })
                         .json("200", APIAvailableResponse.class),
@@ -139,21 +145,21 @@ public class WebServer {
         });
         this.javalin.get("/api/parentVersions", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all parent versions"))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all parent versions").addTagsItem(VERSIONS_TAG))
                         .jsonArray("200", String.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) context -> context.result(JsonDocument.GSON.toJson(this.server.getParentVersionNames()))
         ));
         this.javalin.get("/api/versions", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions"))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions").addTagsItem(VERSIONS_TAG))
                         .jsonArray("200", String.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) context -> context.result(JsonDocument.GSON.toJson(Arrays.stream(this.server.getDatabase().getAllVersions()).map(CloudNetVersion::getName).collect(Collectors.toList())))
         ));
         this.javalin.get("/api/versions/:parent", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions available for a specific parent version"))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the names of all versions available for a specific parent version").addTagsItem(VERSIONS_TAG))
                         .pathParam("parent", String.class, parameter -> parameter.description("The name of the parent version"))
                         .jsonArray("200", CloudNetVersion.class)
                         .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
@@ -168,7 +174,7 @@ public class WebServer {
         ));
         this.javalin.get("/api/versions/:parent/:version", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available information for a specific version"))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available information for a specific version").addTagsItem(VERSIONS_TAG))
                         .pathParam("parent", String.class, parameter -> parameter.description("The name of the parent version"))
                         .pathParam("version", String.class, parameter -> parameter.description("The name of the version"))
                         .json("200", CloudNetVersion.class)
@@ -185,7 +191,7 @@ public class WebServer {
 
         this.javalin.get("/api/languages", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages"))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get all available languages").addTagsItem(GENERAL_TAG))
                         .jsonArray("200", String.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) context -> context.json(this.server.getConfiguration().getAvailableLanguages())
@@ -202,19 +208,6 @@ public class WebServer {
         this.initFAQAPI();
         this.initModuleAPI();
 
-        this.javalin.get("/api/modules/list", documented(
-                document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all modules"))
-                        .jsonArray("200", RepositoryModuleInfo.class)
-                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
-                (Handler) context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos())
-        ));
-        this.javalin.exception(ModuleInstallException.class, (exception, context) -> context.status(400).contentType("application/json").result(JsonDocument.newDocument()
-                .append("message", exception.getMessage())
-                .append("status", 400)
-                .toPrettyJson()
-        ));
-
         this.javalin.get("/admin/api", context -> context.result("{}"), Set.of(WebPermissionRole.MEMBER));
 
         this.javalin.start(this.server.getConfiguration().getWebPort());
@@ -230,7 +223,7 @@ public class WebServer {
                 });
                 get(documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version").addTagsItem(FAQ_TAG))
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                         (Handler) context -> context.json(this.server.getDatabase().getFAQEntries(context.pathParam("parent")))
@@ -239,6 +232,7 @@ public class WebServer {
                         document()
                                 .operation((OpenApiUpdater<Operation>) operation -> operation
                                         .summary("Get a list of all available faq entries for the specific parent version and language")
+                                        .addTagsItem(FAQ_TAG)
                                 )
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
@@ -346,7 +340,7 @@ public class WebServer {
                 });
                 get("/list", documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules for a specific parent version"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules for a specific parent version").addTagsItem(MODULES_TAG))
                                 .jsonArray("200", RepositoryModuleInfo.class)
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
@@ -354,7 +348,7 @@ public class WebServer {
                 ));
                 get("/list/:group", documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules from the given group for a specific parent version"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("List all available modules from the given group for a specific parent version").addTagsItem(MODULES_TAG))
                                 .jsonArray("200", RepositoryModuleInfo.class)
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
@@ -368,7 +362,7 @@ public class WebServer {
                 ));
                 get("/latest/:group/:name", documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the latest module from the given group with the given name for a specific parent version"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the latest module from the given group with the given name for a specific parent version").addTagsItem(MODULES_TAG))
                                 .json("200", RepositoryModuleInfo.class)
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
@@ -385,7 +379,7 @@ public class WebServer {
                 ));
                 get("/file/:group/:name", documented(
                         document()
-                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Download the Jar of a module"))
+                                .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Download the Jar of a module").addTagsItem(MODULES_TAG))
                                 .result("200", null, "application/zip")
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version or group and name combination not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
@@ -422,7 +416,18 @@ public class WebServer {
             });
         });
 
-
+        this.javalin.get("/api/modules/list", documented(
+                document()
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all modules").addTagsItem(MODULES_TAG))
+                        .jsonArray("200", RepositoryModuleInfo.class)
+                        .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
+                (Handler) context -> context.json(this.server.getModuleRepositoryProvider().getModuleInfos())
+        ));
+        this.javalin.exception(ModuleInstallException.class, (exception, context) -> context.status(400).contentType("application/json").result(JsonDocument.newDocument()
+                .append("message", exception.getMessage())
+                .append("status", 400)
+                .toPrettyJson()
+        ));
     }
 
     private void addVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {

@@ -90,6 +90,7 @@ public class CloudNetUpdateServer {
     private void initCommands() {
         this.commandMap = new DefaultCommandMap();
         this.commandMap.registerCommand(new CommandUser(this));
+        // todo more commands (help, stop, reload)
 
         this.console.addCommandHandler(UUID.randomUUID(), input -> {
             try {
