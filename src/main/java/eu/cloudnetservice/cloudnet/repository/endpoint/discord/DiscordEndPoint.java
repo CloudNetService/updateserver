@@ -13,6 +13,7 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.TextChannel;
@@ -40,10 +41,21 @@ public class DiscordEndPoint implements EndPoint {
     private String token;
     private String commandPrefix;
     private Map<DiscordPermissionState, String> permissionStateRoles;
-    private long updatesChannelId;
+    private Guild guild;
+    private long guildId;
+
+    private DiscordLoginManager loginManager = new DiscordLoginManager(this);
 
     public JDA getJda() {
         return this.jda;
+    }
+
+    public DiscordLoginManager getLoginManager() {
+        return loginManager;
+    }
+
+    public Guild getGuild() {
+        return this.guild;
     }
 
     public Map<DiscordPermissionState, String> getPermissionStateRoles() {
@@ -73,7 +85,7 @@ public class DiscordEndPoint implements EndPoint {
         boolean exists = Files.exists(configPath);
         JsonDocument configDocument = exists ? JsonDocument.newDocument(configPath) : JsonDocument.newDocument();
         this.token = configDocument.getString("token", "");
-        this.updatesChannelId = configDocument.getLong("updatesChannelId", 0L);
+        this.guildId = configDocument.getLong("guildId", 1L);
         this.commandPrefix = configDocument.getString("commandPrefix", "!");
         this.permissionStateRoles = configDocument.get(
                 "permissionStateRoles",
@@ -90,7 +102,7 @@ public class DiscordEndPoint implements EndPoint {
     public boolean init(CloudNetUpdateServer updateServer, Path configPath) {
         this.readConfig(configPath);
 
-        if (this.token == null || this.token.isEmpty() || this.updatesChannelId <= 0) {
+        if (this.token == null || this.token.isEmpty()) {
             return false;
         }
         try {
@@ -98,6 +110,13 @@ public class DiscordEndPoint implements EndPoint {
                     .setAutoReconnect(true)
                     .build()
                     .awaitReady();
+
+            this.guild = this.jda.getGuildById(this.guildId);
+            if (this.guild == null) {
+                System.err.println("Guild not found");
+                this.jda.shutdown();
+                return false;
+            }
 
             for (CloudNetParentVersion parentVersion : updateServer.getParentVersions()) {
                 if (!parentVersion.getProperties().containsKey(PROPERTIES_KEY_UPDATES_CHANNEL_ID)) {

@@ -1,13 +1,27 @@
 package eu.cloudnetservice.cloudnet.repository.endpoint.discord.command;
 
 import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
+import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
 import net.dv8tion.jda.api.entities.Member;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public enum DiscordPermissionState {
-    OPERATOR, DEVELOPER, MODERATOR, EVERYONE;
+    OPERATOR(WebPermissionRole.OPERATOR),
+    DEVELOPER(WebPermissionRole.DEVELOPER),
+    MODERATOR(WebPermissionRole.MODERATOR),
+    EVERYONE(WebPermissionRole.MEMBER);
+
+    private WebPermissionRole web;
+
+    DiscordPermissionState(WebPermissionRole web) {
+        this.web = web;
+    }
+
+    public WebPermissionRole toWeb() {
+        return this.web;
+    }
 
     public static Map<DiscordPermissionState, String> getDefaultMappings() {
         Map<DiscordPermissionState, String> map = new HashMap<>();

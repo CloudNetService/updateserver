@@ -3,6 +3,8 @@ package eu.cloudnetservice.cloudnet.repository.web;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.Constants;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordEndPoint;
+import eu.cloudnetservice.cloudnet.repository.endpoint.discord.DiscordLoginManager;
 import eu.cloudnetservice.cloudnet.repository.faq.FAQEntry;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleInstallException;
@@ -13,6 +15,7 @@ import eu.cloudnetservice.cloudnet.repository.web.handler.ArchivedVersionHandler
 import eu.cloudnetservice.cloudnet.repository.web.handler.GitHubWebHookReleaseEventHandler;
 import io.javalin.Javalin;
 import io.javalin.http.*;
+import io.javalin.http.util.RateLimit;
 import io.javalin.plugin.json.JavalinJson;
 import io.javalin.plugin.openapi.OpenApiOptions;
 import io.javalin.plugin.openapi.OpenApiPlugin;
@@ -27,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
@@ -100,20 +104,49 @@ public class WebServer {
                 return;
             }
 
-            String username;
-            String password;
-            try {
-                username = ctx.basicAuthCredentials().getUsername();
-                password = ctx.basicAuthCredentials().getPassword();
-            } catch (IllegalArgumentException exception) {
+            String authorization = ctx.header("Authorization");
+            if (authorization == null) {
                 ctx.header("WWW-Authenticate", "Basic realm=\"Administration\"");
-                throw new UnauthorizedResponse(exception.getMessage());
+                throw new UnauthorizedResponse();
             }
 
-            if (!this.server.getDatabase().checkUserPassword(username, password)) {
-                throw new ForbiddenResponse("Invalid credentials");
+            new RateLimit(ctx).requestPerTimeUnit(5, TimeUnit.MINUTES);
+
+            String[] authParts = authorization.split(" ");
+            if (authParts.length != 2) {
+                throw new ForbiddenResponse("Wrong authorization header");
             }
-            WebPermissionRole role = this.server.getDatabase().getRole(username);
+
+            WebPermissionRole role;
+
+            if (authParts[0].equalsIgnoreCase("Basic")) {
+                String username;
+                String password;
+                try {
+                    username = ctx.basicAuthCredentials().getUsername();
+                    password = ctx.basicAuthCredentials().getPassword();
+                } catch (IllegalArgumentException exception) {
+                    ctx.header("WWW-Authenticate", "Basic realm=\"Administration\"");
+                    throw new UnauthorizedResponse(exception.getMessage());
+                }
+
+                if (!this.server.getDatabase().checkUserPassword(username, password)) {
+                    throw new ForbiddenResponse("Invalid credentials");
+                }
+                role = this.server.getDatabase().getRole(username);
+            } else if (authParts[0].equalsIgnoreCase("Bearer")) {
+
+                String token = authParts[1];
+
+                DiscordLoginManager loginManager = this.server.getEndPoint(DiscordEndPoint.class)
+                        .orElseThrow(() -> new ForbiddenResponse("Discord not enabled"))
+                        .getLoginManager();
+
+                role = loginManager.getRole(token);
+            } else {
+                throw new ForbiddenResponse("Unsupported authorization");
+            }
+
             if (permittedRoles.stream().noneMatch(permittedRole -> ((WebPermissionRole) permittedRole).canInteract(role))) {
                 throw new ForbiddenResponse("Not enough permissions");
             }

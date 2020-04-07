@@ -121,6 +121,13 @@ public class CloudNetUpdateServer {
         return this.endPoints;
     }
 
+    public <T extends EndPoint> Optional<T> getEndPoint(Class<T> tClass) {
+        return this.endPoints.stream()
+                .filter(tClass::isInstance)
+                .map(tClass::cast)
+                .findFirst();
+    }
+
     public CloudNetVersion getCurrentLatestVersion(String parentVersionName) {
         return this.database.getLatestVersion(parentVersionName);
     }
