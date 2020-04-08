@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -72,25 +73,14 @@ public class ModuleRepositoryProvider {
             Files.copy(inputStream, tempFile);
 
             try (ZipFile zipFile = new ZipFile(tempFile.toFile())) {
-                ZipEntry entry = zipFile.getEntry("module.json");
-                if (entry == null) {
-                    throw new ModuleInstallException("Module has either no module.json");
+                ModuleId moduleId = this.readModuleId(zipFile);
+
+                if (moduleId.getGroup() == null || moduleId.getName() == null || moduleId.getVersion().equals("latest")) {
+                    throw new ModuleInstallException("module.json doesn't contain a group, name or version");
                 }
-                try (InputStream moduleStream = zipFile.getInputStream(entry)) {
-                    JsonDocument document = JsonDocument.newDocument(new String(moduleStream.readAllBytes()));
 
-                    ModuleId moduleId = new ModuleId(
-                            document.getString("group"),
-                            document.getString("name"),
-                            document.getString("version")
-                    );
+                moduleInfo.setModuleId(moduleId);
 
-                    if (moduleId.getGroup() == null || moduleId.getName() == null || moduleId.getVersion().equals("latest")) {
-                        throw new ModuleInstallException("module.json doesn't contain a group, name or version");
-                    }
-
-                    moduleInfo.setModuleId(moduleId);
-                }
             }
 
             inputStream = Files.newInputStream(tempFile, StandardOpenOption.DELETE_ON_CLOSE);
@@ -106,6 +96,47 @@ public class ModuleRepositoryProvider {
         this.installModuleFile(moduleInfo, inputStream);
 
         this.server.getDatabase().insertModuleInfo(moduleInfo);
+    }
+
+    private ModuleId readModuleId(ZipFile zipFile) throws IOException {
+        ZipEntry entry = zipFile.getEntry("module.json");
+        if (entry != null) {
+            try (InputStream moduleStream = zipFile.getInputStream(entry)) {
+                JsonDocument document = JsonDocument.newDocument(new String(moduleStream.readAllBytes()));
+
+                return new ModuleId(
+                        document.getString("group"),
+                        document.getString("name"),
+                        document.getString("version")
+                );
+            }
+        }
+        entry = zipFile.getEntry("module.properties");
+        if (entry != null) {
+            try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                Properties properties = new Properties();
+                properties.load(inputStream);
+
+                String group;
+                if (properties.containsKey("group")) {
+                    group = properties.getProperty("group");
+                } else if (properties.containsKey("main")) {
+                    String main = properties.getProperty("main");
+                    int lastSeparator = main.lastIndexOf('.');
+                    group = lastSeparator == -1 ? "eu.cloudnetservice.modules" : main.substring(0, lastSeparator);
+                } else {
+                    throw new ModuleInstallException("Invalid module.properties doesn't contain main");
+                }
+
+                return new ModuleId(
+                        group,
+                        properties.getProperty("name"),
+                        properties.getProperty("version")
+                );
+            }
+        }
+
+        throw new ModuleInstallException("Module has no module.json/module.properties");
     }
 
     public void updateModule(RepositoryModuleInfo moduleInfo) {
@@ -153,7 +184,7 @@ public class ModuleRepositoryProvider {
                 if (entry.getName().equals(parentVersion.getModuleFileName())) {
                     JsonDocument document = JsonDocument.newDocument().read(zipInputStream);
                     ModuleId realModuleId = document.toInstanceOf(ModuleId.class);
-                    if (!realModuleId.equals(moduleId)) {
+                    if (!realModuleId.equalsIgnoreVersion(moduleId)) {
                         throw new ModuleInstallException("Given moduleId and module.json don't match");
                     }
                     return;

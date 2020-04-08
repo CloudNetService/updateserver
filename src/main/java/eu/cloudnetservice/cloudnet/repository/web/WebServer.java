@@ -100,9 +100,12 @@ public class WebServer {
         JavalinJson.setFromJsonMapper(JsonDocument.GSON::fromJson);
 
         this.javalin.config.accessManager((handler, ctx, permittedRoles) -> {
-            if (!ctx.path().startsWith("/admin") || permittedRoles.isEmpty()) {
+            if (!ctx.path().startsWith("/admin")) {
                 handler.handle(ctx);
                 return;
+            }
+            if (permittedRoles.isEmpty()) {
+                throw new InternalServerErrorResponse("No roles for an admin action defined");
             }
 
             String authorization = ctx.header("Authorization");
@@ -111,7 +114,7 @@ public class WebServer {
                 throw new UnauthorizedResponse();
             }
 
-            new RateLimit(ctx).requestPerTimeUnit(5, TimeUnit.MINUTES);
+            new RateLimit(ctx).requestPerTimeUnit(15, TimeUnit.MINUTES);
 
             String[] authParts = authorization.split(" ");
             if (authParts.length != 2) {
@@ -438,17 +441,19 @@ public class WebServer {
             });
 
             path("/admin/api/modules/:parent", () -> {
-                post("/create", context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
-                post("/modify", context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
-                delete("/delete/:group/:name", context -> {
-                    String parentVersionName = context.pathParam("parent");
-                    ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
-                    if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
-                        context.status(404);
-                        return;
-                    }
-                    System.out.println("Module " + moduleId.getGroup() + ":" + moduleId.getName() + ":" + moduleId.getVersion() + " deleted by " + context.sessionAttribute("Username"));
-                    this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
+                post("/create", context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context), Set.of(WebPermissionRole.MODERATOR));
+                path("/:group/:name", () -> {
+                    post("/modify", context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context), Set.of(WebPermissionRole.MODERATOR));
+                    delete("/delete", context -> {
+                        String parentVersionName = context.pathParam("parent");
+                        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
+                        if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
+                            context.status(404);
+                            return;
+                        }
+                        System.out.println("Module " + moduleId.getGroup() + ":" + moduleId.getName() + ":" + moduleId.getVersion() + " deleted by " + context.sessionAttribute("Username"));
+                        this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
+                    }, Set.of(WebPermissionRole.MODERATOR));
                 });
             });
         });
@@ -518,35 +523,34 @@ public class WebServer {
         );
         this.server.getModuleRepositoryProvider().addModule(moduleInfo, inputStream);
 
-        System.out.println("Module added by " + context.sessionAttribute("Username"));
+        System.out.println("Module " + moduleInfo.getModuleId() + " added by " + context.sessionAttribute("Username"));
         context.result(SUCCESS_JSON);
     }
 
     private void updateVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {
-        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"));
+        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
         RepositoryModuleInfo oldModuleInfo = this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersion.getName(), moduleId);
 
         if (oldModuleInfo == null) {
             throw new BadRequestResponse("Version not found");
         }
 
-        Map<String, String> headers = context.headerMap();
-        String[] authors = headers.containsKey("X-Authors") ? headers.get("X-Authors").split(";") : oldModuleInfo.getAuthors();
-        ModuleId[] depends = headers.containsKey("X-Depends") ? Arrays.stream(this.formParamOrElse(context, "X-Depends", "").split(";"))
+        String[] authors = context.formParam("authors") != null ? context.formParam("authors").split(";") : oldModuleInfo.getAuthors();
+        ModuleId[] depends = context.formParam("depends") != null ? Arrays.stream(this.formParamOrElse(context, "depends", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new) : oldModuleInfo.getDepends();
-        ModuleId[] conflicts = headers.containsKey("X-Conflicts") ? Arrays.stream(this.formParamOrElse(context, "X-Conflicts", "").split(";"))
+        ModuleId[] conflicts = context.formParam("conflicts") != null ? Arrays.stream(this.formParamOrElse(context, "X-Conflicts", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new) : oldModuleInfo.getConflicts();
-        String description = this.formParamOrElse(context, "X-Description", oldModuleInfo.getDescription());
-        String website = this.formParamOrElse(context, "X-Website", oldModuleInfo.getWebsite());
-        String sourceUrl = this.formParamOrElse(context, "X-SourceURL", oldModuleInfo.getSourceUrl());
-        String supportUrl = this.formParamOrElse(context, "X-SupportURL", oldModuleInfo.getSupportUrl());
+        String description = this.formParamOrElse(context, "description", oldModuleInfo.getDescription());
+        String website = this.formParamOrElse(context, "website", oldModuleInfo.getWebsite());
+        String sourceUrl = this.formParamOrElse(context, "sourceURL", oldModuleInfo.getSourceUrl());
+        String supportUrl = this.formParamOrElse(context, "supportURL", oldModuleInfo.getSupportUrl());
 
         RepositoryModuleInfo moduleInfo = new RepositoryModuleInfo(
-                moduleId,
+                oldModuleInfo.getModuleId(),
                 authors,
                 depends,
                 conflicts,
@@ -558,17 +562,19 @@ public class WebServer {
                 supportUrl
         );
 
-        if (oldModuleInfo.getModuleId().getVersion().equals(moduleId.getVersion())) {
+        UploadedFile file = context.uploadedFile("modulefile");
+
+        if (file == null) {
             this.server.getModuleRepositoryProvider().updateModule(moduleInfo);
 
-            System.out.println("Module updated by " + context.sessionAttribute("Username"));
+            System.out.println("Module " + moduleId + " updated by " + context.sessionAttribute("Username"));
             context.result(SUCCESS_JSON);
             return;
         }
 
-        this.server.getModuleRepositoryProvider().updateModuleWithFile(moduleInfo, new ByteArrayInputStream(context.bodyAsBytes()));
+        this.server.getModuleRepositoryProvider().updateModuleWithFile(moduleInfo, file.getContent());
 
-        System.out.println("Module updated by " + context.sessionAttribute("Username"));
+        System.out.println("Module " + moduleId + " and file updated by " + context.sessionAttribute("Username"));
         context.result(SUCCESS_JSON);
     }
 
