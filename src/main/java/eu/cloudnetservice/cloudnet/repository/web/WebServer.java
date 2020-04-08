@@ -427,7 +427,10 @@ public class WebServer {
                             if (inputStream == null) {
                                 context.status(404);
                             } else {
-                                context.contentType("application/zip").result(inputStream);
+                                context
+                                        .contentType("application/zip")
+                                        .header("Content-Disposition", "attachment; filename=" + context.pathParam("name") + ".jar")
+                                        .result(inputStream);
                             }
                         }
                 ));
