@@ -138,7 +138,7 @@ public class WebServer {
                     throw new ForbiddenResponse("Invalid credentials");
                 }
                 role = this.server.getDatabase().getRole(username);
-                ctx.sessionAttribute("Username", username);
+                ctx.sessionAttribute("Username", "BASIC:" + username);
             } else if (authParts[0].equalsIgnoreCase("Bearer")) {
 
                 String token = authParts[1];

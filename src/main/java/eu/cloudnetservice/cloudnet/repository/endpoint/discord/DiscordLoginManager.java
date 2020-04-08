@@ -48,7 +48,7 @@ public class DiscordLoginManager {
             throw new ForbiddenResponse("Not on CloudNet guild");
         }
 
-        ctx.sessionAttribute("Username", member.getUser().getName() + "#" + member.getUser().getDiscriminator() + " (" + member.getId() + ")");
+        ctx.sessionAttribute("Username", "DISCORD:" + member.getUser().getName() + "#" + member.getUser().getDiscriminator() + " (" + member.getId() + ")");
 
         return this.endPoint.getPermissionStateRoles().entrySet().stream()
                 .filter(entry -> member.getRoles().stream().anyMatch(role -> role.getId().equals(entry.getValue())))
