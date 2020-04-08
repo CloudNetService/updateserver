@@ -7,20 +7,14 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
+import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 public class ModuleRepositoryProvider {
@@ -71,6 +65,37 @@ public class ModuleRepositoryProvider {
     }
 
     public void addModule(RepositoryModuleInfo moduleInfo, InputStream inputStream) throws IOException {
+        if (moduleInfo.getModuleId() == null) {
+            Path tempFile = Paths.get("temp/" + UUID.randomUUID() + "-Module.jar");
+            Files.createDirectories(tempFile.getParent());
+
+            Files.copy(inputStream, tempFile);
+
+            try (ZipFile zipFile = new ZipFile(tempFile.toFile())) {
+                ZipEntry entry = zipFile.getEntry("module.json");
+                if (entry == null) {
+                    throw new ModuleInstallException("Module has either no module.json");
+                }
+                try (InputStream moduleStream = zipFile.getInputStream(entry)) {
+                    JsonDocument document = JsonDocument.newDocument(new String(moduleStream.readAllBytes()));
+
+                    ModuleId moduleId = new ModuleId(
+                            document.getString("group"),
+                            document.getString("name"),
+                            document.getString("version")
+                    );
+
+                    if (moduleId.getGroup() == null || moduleId.getName() == null || moduleId.getVersion().equals("latest")) {
+                        throw new ModuleInstallException("module.json doesn't contain a group, name or version");
+                    }
+
+                    moduleInfo.setModuleId(moduleId);
+                }
+            }
+
+            inputStream = Files.newInputStream(tempFile, StandardOpenOption.DELETE_ON_CLOSE);
+        }
+
         if (moduleInfo.getModuleId().getVersion().equals("latest")) {
             throw new ModuleInstallException("latest as the version on install is not allowed");
         }

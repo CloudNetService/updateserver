@@ -28,8 +28,12 @@ public class RepositoryModuleInfo {
         this.supportUrl = supportUrl;
     }
 
+    public void setModuleId(ModuleId moduleId) {
+        this.moduleId = moduleId;
+    }
+
     public ModuleId getModuleId() {
-        return moduleId;
+        return this.moduleId;
     }
 
     public String getParentVersionName() {

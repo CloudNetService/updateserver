@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
@@ -433,20 +434,16 @@ public class WebServer {
             });
 
             path("/admin/api/:parent/modules", () -> {
-                path("/:group/:name", () -> {
-                    path(":version", () -> {
-                        post(context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
-                        patch(context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
-                    });
-                    delete(context -> {
-                        String parentVersionName = context.pathParam(":parent");
-                        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
-                        if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
-                            context.status(404);
-                            return;
-                        }
-                        this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
-                    });
+                post("/create", context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
+                post("/modify", context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
+                post("/delete/:group/:name", context -> {
+                    String parentVersionName = context.pathParam(":parent");
+                    ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
+                    if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
+                        context.status(404);
+                        return;
+                    }
+                    this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
                 });
             });
         });
@@ -465,33 +462,45 @@ public class WebServer {
         ));
     }
 
+    private String formParamOrElse(Context context, String key, String def) {
+        String result = context.formParam(key);
+        return result != null ? result : def;
+    }
+
+    private String formParamOrThrow(Context context, String key, Supplier<RuntimeException> supplier) {
+        String result = context.formParam(key);
+        if (result == null) {
+            throw supplier.get();
+        }
+        return result;
+    }
+    
     private void addVersion(CloudNetParentVersion parentVersion, Context context) throws IOException {
         if (this.server.getCurrentLatestVersion(parentVersion.getName()) == null) {
             throw new BadRequestResponse("No versions have been released for this parent");
         }
 
-        Map<String, String> headers = context.headerMap();
-        String[] authors = headers.getOrDefault("X-Authors", "Unknown").split(";");
-        ModuleId[] depends = Arrays.stream(headers.getOrDefault("X-Depends", "").split(";"))
+        String[] authors = this.formParamOrElse(context, "authors", "Unknown").split(";");
+        ModuleId[] depends = Arrays.stream(this.formParamOrElse(context, "depends", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new);
-        ModuleId[] conflicts = Arrays.stream(headers.getOrDefault("X-Conflicts", "").split(";"))
+        ModuleId[] conflicts = Arrays.stream(this.formParamOrElse(context, "conflicts", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new);
-        ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"), context.pathParam("version"));
-        String description = headers.computeIfAbsent("X-Description", s -> {
-            throw new BadRequestResponse("description is required");
-        });
-        String website = headers.get("X-Website");
-        String sourceUrl = headers.computeIfAbsent("X-SourceURL", s -> {
-            throw new BadRequestResponse("SourceCode is required");
-        });
-        String supportUrl = headers.get("X-SupportURL");
+        String description = this.formParamOrThrow(context, "description", () -> new BadRequestResponse("description is required"));
+        String website = context.formParam("website");
+        String sourceUrl = this.formParamOrThrow(context, "sourceURL", () -> new BadRequestResponse("SourceCode is required"));
+        String supportUrl = context.formParam("supportURL");
+        UploadedFile file = context.uploadedFile("modulefile");
+        if (file == null) {
+            throw new BadRequestResponse("No file uploaded");
+        }
+        InputStream inputStream = file.getContent();
 
         RepositoryModuleInfo moduleInfo = new RepositoryModuleInfo(
-                moduleId,
+                null,
                 authors,
                 depends,
                 conflicts,
@@ -502,7 +511,7 @@ public class WebServer {
                 sourceUrl,
                 supportUrl
         );
-        this.server.getModuleRepositoryProvider().addModule(moduleInfo, new ByteArrayInputStream(context.bodyAsBytes()));
+        this.server.getModuleRepositoryProvider().addModule(moduleInfo, inputStream);
 
         System.out.println("Module added by " + context.basicAuthCredentials().getUsername());
         context.result(SUCCESS_JSON);
@@ -518,18 +527,18 @@ public class WebServer {
 
         Map<String, String> headers = context.headerMap();
         String[] authors = headers.containsKey("X-Authors") ? headers.get("X-Authors").split(";") : oldModuleInfo.getAuthors();
-        ModuleId[] depends = headers.containsKey("X-Depends") ? Arrays.stream(headers.getOrDefault("X-Depends", "").split(";"))
+        ModuleId[] depends = headers.containsKey("X-Depends") ? Arrays.stream(this.formParamOrElse(context, "X-Depends", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new) : oldModuleInfo.getDepends();
-        ModuleId[] conflicts = headers.containsKey("X-Conflicts") ? Arrays.stream(headers.getOrDefault("X-Conflicts", "").split(";"))
+        ModuleId[] conflicts = headers.containsKey("X-Conflicts") ? Arrays.stream(this.formParamOrElse(context, "X-Conflicts", "").split(";"))
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new) : oldModuleInfo.getConflicts();
-        String description = headers.getOrDefault("X-Description", oldModuleInfo.getDescription());
-        String website = headers.getOrDefault("X-Website", oldModuleInfo.getWebsite());
-        String sourceUrl = headers.getOrDefault("X-SourceURL", oldModuleInfo.getSourceUrl());
-        String supportUrl = headers.getOrDefault("X-SupportURL", oldModuleInfo.getSupportUrl());
+        String description = this.formParamOrElse(context, "X-Description", oldModuleInfo.getDescription());
+        String website = this.formParamOrElse(context, "X-Website", oldModuleInfo.getWebsite());
+        String sourceUrl = this.formParamOrElse(context, "X-SourceURL", oldModuleInfo.getSourceUrl());
+        String supportUrl = this.formParamOrElse(context, "X-SupportURL", oldModuleInfo.getSupportUrl());
 
         RepositoryModuleInfo moduleInfo = new RepositoryModuleInfo(
                 moduleId,
