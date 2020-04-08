@@ -135,6 +135,7 @@ public class WebServer {
                     throw new ForbiddenResponse("Invalid credentials");
                 }
                 role = this.server.getDatabase().getRole(username);
+                ctx.sessionAttribute("Username", username);
             } else if (authParts[0].equalsIgnoreCase("Bearer")) {
 
                 String token = authParts[1];
@@ -143,7 +144,7 @@ public class WebServer {
                         .orElseThrow(() -> new ForbiddenResponse("Discord not enabled"))
                         .getLoginManager();
 
-                role = loginManager.getRole(token);
+                role = loginManager.getRole(ctx, token);
             } else {
                 throw new ForbiddenResponse("Unsupported authorization");
             }
@@ -315,14 +316,14 @@ public class WebServer {
                 System.currentTimeMillis(),
                 question,
                 answer,
-                context.basicAuthCredentials().getUsername(),
+                context.sessionAttribute("Username"),
                 new HashMap<>()
         );
         this.server.getDatabase().insertFAQEntry(entry);
 
         context.json(entry);
 
-        System.out.println("FAQ entry " + uniqueId + " inserted by " + context.basicAuthCredentials().getUsername() + ": ");
+        System.out.println("FAQ entry " + uniqueId + " inserted by " + context.sessionAttribute("Username") + ": ");
         System.out.println(" - Question: " + question);
         System.out.println(" - Answer: " + answer);
     }
@@ -347,7 +348,7 @@ public class WebServer {
         }
         this.server.getDatabase().updateFAQEntry(entry);
 
-        System.out.println("FAQEntry " + uniqueId + " updated by " + context.basicAuthCredentials().getUsername());
+        System.out.println("FAQEntry " + uniqueId + " updated by " + context.sessionAttribute("Username"));
     }
 
     private void deleteFAQEntry(CloudNetParentVersion parentVersion, Context context) {
@@ -363,7 +364,7 @@ public class WebServer {
 
         this.server.getDatabase().deleteFAQEntry(entry.getUniqueId());
 
-        System.out.println("FAQEntry " + uniqueId + " deleted by " + context.basicAuthCredentials().getUsername());
+        System.out.println("FAQEntry " + uniqueId + " deleted by " + context.sessionAttribute("Username"));
     }
 
     private void initModuleAPI() {
@@ -436,16 +437,17 @@ public class WebServer {
                 ));
             });
 
-            path("/admin/api/:parent/modules", () -> {
+            path("/admin/api/modules/:parent", () -> {
                 post("/create", context -> this.addVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
                 post("/modify", context -> this.updateVersion(this.server.getParentVersion(context.pathParam("parent")).orElseThrow(NotFoundResponse::new), context));
-                post("/delete/:group/:name", context -> {
-                    String parentVersionName = context.pathParam(":parent");
+                delete("/delete/:group/:name", context -> {
+                    String parentVersionName = context.pathParam("parent");
                     ModuleId moduleId = new ModuleId(context.pathParam("group"), context.pathParam("name"));
                     if (this.server.getModuleRepositoryProvider().getModuleInfoIgnoreVersion(parentVersionName, moduleId) == null) {
                         context.status(404);
                         return;
                     }
+                    System.out.println("Module " + moduleId.getGroup() + ":" + moduleId.getName() + ":" + moduleId.getVersion() + " deleted by " + context.sessionAttribute("Username"));
                     this.server.getModuleRepositoryProvider().removeModule(parentVersionName, moduleId);
                 });
             });
@@ -516,7 +518,7 @@ public class WebServer {
         );
         this.server.getModuleRepositoryProvider().addModule(moduleInfo, inputStream);
 
-        System.out.println("Module added by " + context.basicAuthCredentials().getUsername());
+        System.out.println("Module added by " + context.sessionAttribute("Username"));
         context.result(SUCCESS_JSON);
     }
 
@@ -559,14 +561,14 @@ public class WebServer {
         if (oldModuleInfo.getModuleId().getVersion().equals(moduleId.getVersion())) {
             this.server.getModuleRepositoryProvider().updateModule(moduleInfo);
 
-            System.out.println("Module updated by " + context.basicAuthCredentials().getUsername());
+            System.out.println("Module updated by " + context.sessionAttribute("Username"));
             context.result(SUCCESS_JSON);
             return;
         }
 
         this.server.getModuleRepositoryProvider().updateModuleWithFile(moduleInfo, new ByteArrayInputStream(context.bodyAsBytes()));
 
-        System.out.println("Module updated by " + context.basicAuthCredentials().getUsername());
+        System.out.println("Module updated by " + context.sessionAttribute("Username"));
         context.result(SUCCESS_JSON);
     }
 

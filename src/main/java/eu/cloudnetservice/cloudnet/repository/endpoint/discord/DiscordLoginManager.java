@@ -3,6 +3,7 @@ package eu.cloudnetservice.cloudnet.repository.endpoint.discord;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.endpoint.discord.command.DiscordPermissionState;
 import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
+import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
 import net.dv8tion.jda.api.entities.Member;
 
@@ -25,7 +26,7 @@ public class DiscordLoginManager {
         this.httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
     }
 
-    public WebPermissionRole getRole(String authToken) throws IOException, InterruptedException {
+    public WebPermissionRole getRole(Context ctx, String authToken) throws IOException, InterruptedException {
         HttpResponse<String> response = this.httpClient.send(
                 HttpRequest.newBuilder()
                         .GET()
@@ -46,6 +47,8 @@ public class DiscordLoginManager {
         if (member == null) {
             throw new ForbiddenResponse("Not on CloudNet guild");
         }
+
+        ctx.sessionAttribute("Username", member.getUser().getName() + "#" + member.getUser().getDiscriminator() + " (" + member.getId() + ")");
 
         return this.endPoint.getPermissionStateRoles().entrySet().stream()
                 .filter(entry -> member.getRoles().stream().anyMatch(role -> role.getId().equals(entry.getValue())))
