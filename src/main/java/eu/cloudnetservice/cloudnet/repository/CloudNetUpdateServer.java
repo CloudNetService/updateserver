@@ -152,6 +152,10 @@ public class CloudNetUpdateServer {
         return this.configuration.getParentVersions();
     }
 
+    public ExecutorService getExecutorService() {
+        return this.executorService;
+    }
+
     public Collection<String> getParentVersionNames() {
         return this.getParentVersions().stream().map(CloudNetParentVersion::getName).collect(Collectors.toList());
     }

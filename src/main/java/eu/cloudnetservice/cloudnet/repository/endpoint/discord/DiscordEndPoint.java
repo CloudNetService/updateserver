@@ -13,10 +13,8 @@ import eu.cloudnetservice.cloudnet.repository.version.CloudNetParentVersion;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.MessageChannel;
-import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.*;
 
 import javax.security.auth.login.LoginException;
 import java.nio.file.Files;
@@ -43,6 +41,7 @@ public class DiscordEndPoint implements EndPoint {
     private Map<DiscordPermissionState, String> permissionStateRoles;
     private Guild guild;
     private long guildId;
+    private DiscordPresence[] presences;
 
     private DiscordLoginManager loginManager = new DiscordLoginManager(this);
 
@@ -92,6 +91,10 @@ public class DiscordEndPoint implements EndPoint {
                 TypeToken.getParameterized(Map.class, DiscordPermissionState.class, String.class).getType(),
                 DiscordPermissionState.getDefaultMappings()
         );
+        this.presences = configDocument.get("presences", DiscordPresence[].class, new DiscordPresence[]{
+                new DiscordPresence(OnlineStatus.ONLINE, Activity.ActivityType.WATCHING, "Rop beim Programmieren zu", null, 30000),
+                new DiscordPresence(OnlineStatus.ONLINE, Activity.ActivityType.WATCHING, "Julian beim Pommesessen zu", null, 30000)
+        });
 
         if (!exists) {
             configDocument.write(configPath);
@@ -150,6 +153,34 @@ public class DiscordEndPoint implements EndPoint {
                     "gradle"
             ));
 
+            if (this.presences != null && this.presences.length != 0) {
+                if (this.presences.length == 1) {
+                    this.jda.getPresence().setStatus(this.presences[0].getStatus());
+                    this.presences[0].asActivity().ifPresent(activity -> this.jda.getPresence().setActivity(activity));
+                } else {
+                    updateServer.getExecutorService().execute(() -> {
+                        int presenceIndex = 0;
+
+                        while (!Thread.interrupted() && this.jda != null) {
+                            if (presenceIndex >= this.presences.length) {
+                                presenceIndex = 0;
+                            }
+                            DiscordPresence presence = this.presences[presenceIndex++];
+                            if (this.jda.getPresence().getStatus() != presence.getStatus()) {
+                                this.jda.getPresence().setStatus(presence.getStatus());
+                            }
+                            presence.asActivity().ifPresent(activity -> this.jda.getPresence().setActivity(activity));
+
+                            try {
+                                Thread.sleep(Math.max(5000, presence.getVisibleTimeMillis()));
+                            } catch (InterruptedException exception) {
+                                exception.printStackTrace();
+                            }
+                        }
+                    });
+                }
+            }
+
             return true;
         } catch (InterruptedException | LoginException exception) {
             exception.printStackTrace();
@@ -161,6 +192,7 @@ public class DiscordEndPoint implements EndPoint {
     public void close() {
         if (this.jda != null) {
             this.jda.shutdownNow();
+            this.jda = null;
         }
     }
 
