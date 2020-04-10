@@ -1,5 +1,6 @@
 package eu.cloudnetservice.cloudnet.repository.web;
 
+import com.google.gson.JsonObject;
 import de.dytanic.cloudnet.common.document.gson.JsonDocument;
 import eu.cloudnetservice.cloudnet.repository.CloudNetUpdateServer;
 import eu.cloudnetservice.cloudnet.repository.Constants;
@@ -253,6 +254,12 @@ public class WebServer {
         ));
     }
 
+    private JsonObject serializeFAQEntryNonAuthorization(FAQEntry entry) {
+        JsonObject object = JsonDocument.GSON.toJsonTree(entry).getAsJsonObject();
+        object.remove("creator");
+        return object;
+    }
+
     private void initFAQAPI() {
         this.javalin.routes(() -> {
             path("/api/:parent/faq", () -> {
@@ -266,7 +273,7 @@ public class WebServer {
                                 .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get a list of all available faq entries for the specific parent version").addTagsItem(FAQ_TAG))
                                 .result("404", (Class<?>) null, apiResponse -> apiResponse.description("Parent version not found"))
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
-                        (Handler) context -> context.json(this.server.getDatabase().getFAQEntries(context.pathParam("parent")))
+                        (Handler) context -> context.json(Arrays.stream(this.server.getDatabase().getFAQEntries(context.pathParam("parent"))).map(this::serializeFAQEntryNonAuthorization).toArray(JsonObject[]::new))
                 ));
                 get("/:language", documented(
                         document()
@@ -278,7 +285,8 @@ public class WebServer {
                                 .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                         (Handler) context -> context.json(Arrays.stream(this.server.getDatabase().getFAQEntries(context.pathParam("parent")))
                                 .filter(entry -> entry.getLanguage().equalsIgnoreCase(context.pathParam("language")))
-                                .toArray(FAQEntry[]::new)
+                                .map(this::serializeFAQEntryNonAuthorization)
+                                .toArray(JsonObject[]::new)
                         )
                 ));
             });
