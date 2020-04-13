@@ -79,7 +79,7 @@ public class WebServer {
                             .description("CloudNet 2/3 UpdateServer API")
                             .title("CloudNet Update"))
                     .addServersItem(new Server().url("https://update.cloudnetservice.eu").description("CloudNetService")))
-                    .path("/api/swagger-docs")
+                    .path("/api/json-docs")
                     .ignorePath("/docs/*")
                     .ignorePath("/versions/*")
                     .ignorePath("/admin/*")
