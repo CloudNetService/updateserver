@@ -45,6 +45,7 @@ public class CloudNetUpdateRepository {
         if (version != null) {
             this.repositoryInformation += "app-version=" + version.getName() + "\n" +
                     "git-commit=" + version.getCommit().fetchCommitHash() + "\n" +
+                    "release-timestamp=" + version.getReleaseDate().getTime() + "\n" +
                     "files=" + Arrays.stream(version.getFiles())
                     .filter(file -> file.getFileType() != CloudNetVersionFile.FileType.JAVA_DOCS)
                     .filter(file -> file.getFileType() != CloudNetVersionFile.FileType.CLOUDNET_ZIP)
