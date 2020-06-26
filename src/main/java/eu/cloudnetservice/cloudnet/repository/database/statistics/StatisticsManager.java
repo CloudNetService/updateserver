@@ -5,7 +5,7 @@ import eu.cloudnetservice.cloudnet.repository.database.Database;
 import eu.cloudnetservice.cloudnet.repository.database.statistics.external.ExternalStatistics;
 import eu.cloudnetservice.cloudnet.repository.database.statistics.internal.*;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
-import eu.cloudnetservice.cloudnet.repository.web.WebServer;
+import eu.cloudnetservice.cloudnet.repository.web.registry.GeneralHandlerRegistry;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -18,7 +18,8 @@ import io.swagger.v3.oas.models.Operation;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static io.javalin.apibuilder.ApiBuilder.*;
+import static io.javalin.apibuilder.ApiBuilder.path;
+import static io.javalin.apibuilder.ApiBuilder.post;
 import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.document;
 import static io.javalin.plugin.openapi.dsl.OpenApiBuilder.documented;
 
@@ -57,7 +58,7 @@ public class StatisticsManager {
     private void initWeb(ExecutorService executorService, Javalin javalin) {
         javalin.get("/api/statistics", documented(
                 document()
-                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the global statistics of CloudNet").addTagsItem(WebServer.GENERAL_TAG))
+                        .operation((OpenApiUpdater<Operation>) operation -> operation.summary("Get the global statistics of CloudNet").addTagsItem(GeneralHandlerRegistry.GENERAL_TAG))
                         .json("200", ExternalStatistics.class)
                         .result("500", (Class<?>) null, apiResponse -> apiResponse.description("API not available")),
                 (Handler) ctx -> ctx.json(this.getExternalStatistics())
