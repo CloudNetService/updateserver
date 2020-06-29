@@ -29,11 +29,6 @@ pipeline {
                 sh 'mvn package'
             }
         }
-        stage('Archive') {
-            steps {
-                archiveArtifacts artifacts: '/target/CloudNet-UpdateServer.jar'
-            }
-        }
     }
     post {
         always {
