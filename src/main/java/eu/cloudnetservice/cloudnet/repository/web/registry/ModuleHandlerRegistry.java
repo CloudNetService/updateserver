@@ -146,10 +146,6 @@ public class ModuleHandlerRegistry implements JavalinHandlerRegistry {
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new);
-        ModuleId[] conflicts = Arrays.stream(this.formParamOrElse(context, "conflicts", "").split(";"))
-                .map(ModuleId::parse)
-                .filter(Objects::nonNull)
-                .toArray(ModuleId[]::new);
         String description = this.formParamOrThrow(context, "description", () -> new BadRequestResponse("description is required"));
         String website = context.formParam("website");
         String sourceUrl = this.formParamOrThrow(context, "sourceURL", () -> new BadRequestResponse("SourceCode is required"));
@@ -164,7 +160,6 @@ public class ModuleHandlerRegistry implements JavalinHandlerRegistry {
                 null,
                 authors,
                 depends,
-                conflicts,
                 parentVersion.getName(),
                 null,
                 description,
@@ -193,10 +188,6 @@ public class ModuleHandlerRegistry implements JavalinHandlerRegistry {
                 .map(ModuleId::parse)
                 .filter(Objects::nonNull)
                 .toArray(ModuleId[]::new) : oldModuleInfo.getDepends();
-        ModuleId[] conflicts = context.formParam("conflicts") != null ? Arrays.stream(this.formParamOrElse(context, "X-Conflicts", "").split(";"))
-                .map(ModuleId::parse)
-                .filter(Objects::nonNull)
-                .toArray(ModuleId[]::new) : oldModuleInfo.getConflicts();
         String description = this.formParamOrElse(context, "description", oldModuleInfo.getDescription());
         String website = this.formParamOrElse(context, "website", oldModuleInfo.getWebsite());
         String sourceUrl = this.formParamOrElse(context, "sourceURL", oldModuleInfo.getSourceUrl());
@@ -206,7 +197,6 @@ public class ModuleHandlerRegistry implements JavalinHandlerRegistry {
                 oldModuleInfo.getModuleId(),
                 authors,
                 depends,
-                conflicts,
                 parentVersion.getName(),
                 server.getCurrentLatestVersion(parentVersion.getName()).getName(),
                 description,
