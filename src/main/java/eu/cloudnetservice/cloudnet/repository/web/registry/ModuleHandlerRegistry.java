@@ -74,6 +74,7 @@ public class ModuleHandlerRegistry implements JavalinHandlerRegistry {
                             );
                             if (moduleInfo == null) {
                                 context.status(404);
+                                return;
                             }
                             context.json(moduleInfo);
                         }
