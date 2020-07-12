@@ -6,6 +6,7 @@ import eu.cloudnetservice.cloudnet.repository.github.GitHubReleaseInfo;
 import eu.cloudnetservice.cloudnet.repository.module.ModuleId;
 import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
+import eu.cloudnetservice.cloudnet.repository.version.service.ServiceVersionType;
 import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
 
 import java.io.Closeable;
@@ -82,5 +83,13 @@ public interface Database extends Closeable {
     InternalStatistics getStatistics();
 
     void updateStatistics(InternalStatistics statistics);
+
+    ServiceVersionType[] getServiceVersionTypes(String parentVersionName);
+
+    boolean containsServiceVersionType(String parentVersionName, String name);
+
+    void updateServiceVersionType(ServiceVersionType versionType);
+
+    void insertServiceVersionType(ServiceVersionType versionType);
 
 }

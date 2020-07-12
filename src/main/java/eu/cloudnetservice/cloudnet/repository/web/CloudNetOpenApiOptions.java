@@ -12,10 +12,7 @@ public class CloudNetOpenApiOptions {
 
     public static OpenApiOptions create(CloudNetUpdateServer server) {
         OpenApiOptions options = new OpenApiOptions(() -> new OpenAPI()
-                .info(new Info()
-                        .version("1.0")
-                        .description("CloudNet 2/3 UpdateServer API")
-                        .title("CloudNet Update"))
+                .info(new Info().version("1.0").description("CloudNet 2/3 UpdateServer API").title("CloudNet Update"))
                 .addServersItem(new Server().url("https://update.cloudnetservice.eu").description("CloudNetService")))
                 .path("/api/json-docs")
                 .ignorePath("/docs/*")

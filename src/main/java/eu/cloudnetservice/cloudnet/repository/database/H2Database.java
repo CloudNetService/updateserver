@@ -10,6 +10,7 @@ import eu.cloudnetservice.cloudnet.repository.module.RepositoryModuleInfo;
 import eu.cloudnetservice.cloudnet.repository.util.StringUtils;
 import eu.cloudnetservice.cloudnet.repository.util.ThrowingConsumer;
 import eu.cloudnetservice.cloudnet.repository.version.CloudNetVersion;
+import eu.cloudnetservice.cloudnet.repository.version.service.ServiceVersionType;
 import eu.cloudnetservice.cloudnet.repository.web.WebPermissionRole;
 import eu.cloudnetservice.cloudnet.repository.web.WebUser;
 
@@ -34,6 +35,7 @@ public class H2Database implements Database {
     private FAQEntry[] cachedFAQEntries;
     private WebUser[] cachedUsers;
     private RepositoryModuleInfo[] cachedModules;
+    private ServiceVersionType[] cachedServiceVersions;
 
     public H2Database(Path mvStorePath) {
         this.mvStorePath = mvStorePath;
@@ -45,11 +47,12 @@ public class H2Database implements Database {
         try {
             this.connection = DriverManager.getConnection("jdbc:h2:" + this.mvStorePath.toAbsolutePath());
 
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS versions (name VARCHAR(128), content TEXT)");
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS faq (uniqueId BINARY(16), content TEXT)");
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS users (username VARCHAR(128), password TEXT, role VARCHAR(32))");
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128), parentVersionName VARCHAR(32), content TEXT)");
-            this.executeUpdate("CREATE TABLE IF NOT EXISTS extras (key VARCHAR(128), content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS versions (name VARCHAR(128) NOT NULL, content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS faq (uniqueId BINARY(16) NOT NULL, content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS users (username VARCHAR(128) NOT NULL, password TEXT, role VARCHAR(32))");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS modules (moduleId VARCHAR(128) NOT NULL, parentVersionName VARCHAR(32), content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS extras (key VARCHAR(128) NOT NULL, content TEXT)");
+            this.executeUpdate("CREATE TABLE IF NOT EXISTS service_versions (key VARCHAR(64) NOT NULL, content TEXT)");
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
@@ -58,6 +61,7 @@ public class H2Database implements Database {
         this.cacheFAQEntries();
         this.cacheUsers();
         this.cacheModules();
+        this.cacheServiceVersions();
 
         return true;
     }
@@ -340,6 +344,38 @@ public class H2Database implements Database {
         this.executeUpdate("UPDATE extras SET content = ? WHERE `key` = 'statistics'", preparedStatement -> preparedStatement.setString(1, JsonDocument.newDocument(statistics).toJson()));
     }
 
+    @Override
+    public ServiceVersionType[] getServiceVersionTypes(String parentVersionName) {
+        return Arrays.stream(this.cachedServiceVersions)
+                .filter(versionType -> versionType.getParentVersionName().equals(parentVersionName))
+                .toArray(ServiceVersionType[]::new);
+    }
+
+    @Override
+    public boolean containsServiceVersionType(String parentVersionName, String name) {
+        return Arrays.stream(this.cachedServiceVersions)
+                .filter(versionType -> versionType.getParentVersionName().equals(parentVersionName))
+                .anyMatch(versionType -> versionType.getName().equals(name));
+    }
+
+    @Override
+    public void updateServiceVersionType(ServiceVersionType versionType) {
+        this.executeUpdate("UPDATE service_versions SET content = ? WHERE `key` = ?", preparedStatement -> {
+            preparedStatement.setString(1, this.gson.toJson(versionType));
+            preparedStatement.setString(2, versionType.getParentVersionName() + "-" + versionType.getName());
+        });
+        this.cacheServiceVersions();
+    }
+
+    @Override
+    public void insertServiceVersionType(ServiceVersionType versionType) {
+        this.executeUpdate("INSERT INTO service_versions (`key`, `content`) VALUES (?, ?)", preparedStatement -> {
+            preparedStatement.setString(1, versionType.getParentVersionName() + "-" + versionType.getName());
+            preparedStatement.setString(2, this.gson.toJson(versionType));
+        });
+        this.cacheServiceVersions();
+    }
+
     private byte[] uuidToBytes(UUID uuid) {
         return ByteBuffer.allocate(16).putLong(uuid.getMostSignificantBits()).putLong(uuid.getLeastSignificantBits()).array();
     }
@@ -405,6 +441,19 @@ public class H2Database implements Database {
             exception.printStackTrace();
         }
         this.cachedModules = moduleInfos.toArray(RepositoryModuleInfo[]::new);
+    }
+
+    private void cacheServiceVersions() {
+        Collection<ServiceVersionType> versionTypes = new ArrayList<>();
+        try (PreparedStatement statement = this.connection.prepareStatement("SELECT * FROM service_versions");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                versionTypes.add(this.gson.fromJson(resultSet.getString("content"), ServiceVersionType.class));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        this.cachedServiceVersions = versionTypes.toArray(ServiceVersionType[]::new);
     }
 
     @Override
