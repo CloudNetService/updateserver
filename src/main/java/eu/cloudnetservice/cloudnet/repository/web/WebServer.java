@@ -44,6 +44,7 @@ public class WebServer {
 
     public void init() {
         this.javalin = Javalin.create(config -> {
+            config.showJavalinBanner = false;
             config.enableWebjars();
 
             OpenApiOptions options = CloudNetOpenApiOptions.create(this.server);
