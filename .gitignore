@@ -1,24 +1,14 @@
-# Compiled class file
-*.class
-
-# Package Files
-*.war
-*.ear
-*.zip
-*.tar.gz
-*.rar
-
-# Mavens target direcotry
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-
 # IntelliJ
+.idea/
 *.iml
-.idea
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml
+pom.xml.versionsBackup
+*.class
+target/
+
+# Dependency file
+server/src/main/resources/dependencies.txt
+launcher/src/main/resources/server.jar

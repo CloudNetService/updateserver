@@ -1,4 +1,0 @@
-```groovy
-maven {
-  url '%url%'
-}```
