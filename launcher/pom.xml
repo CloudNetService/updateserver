@@ -58,7 +58,7 @@ limitations under the License.
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <failOnError>true</failOnError>
+                            <failOnError>false</failOnError>
                             <target name="copy server jar">
                                 <copy
                                         file="${basedir}/../server/target/server.jar"
