@@ -64,13 +64,21 @@ public class JenkinsCloudNetVersionFileLoader implements CloudNetVersionFileLoad
             while ((zipEntry = zipInputStream.getNextEntry()) != null) {
 
                 if (zipEntry.isDirectory()) {
-                    Files.createDirectories(tempDirectory.resolve(zipEntry.getName()));
+                    final Path zipEntryPath = tempDirectory.resolve(zipEntry.getName());
+                    if (!zipEntryPath.normalize().startsWith(tempDirectory.normalize())) {
+                        throw new IOException("Bad zip entry");
+                    }
+                    Files.createDirectories(zipEntryPath);
 
                     zipInputStream.closeEntry();
                     continue;
                 }
 
                 Path path = tempDirectory.resolve(zipEntry.getName());
+
+                if (!path.normalize().startsWith(tempDirectory.normalize())) {
+                    throw new IOException("Bad zip entry");
+                }
                 Files.copy(zipInputStream, path);
                 targetPaths.add(path);
 

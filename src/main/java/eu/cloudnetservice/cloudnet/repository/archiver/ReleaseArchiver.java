@@ -150,13 +150,21 @@ public class ReleaseArchiver {
             ZipEntry entry;
             while ((entry = zipInputStream.getNextEntry()) != null) {
                 if (entry.isDirectory()) {
-                    Files.createDirectories(docsDirectory.resolve(entry.getName()));
+                    final Path zipEntryPath = docsDirectory.resolve(entry.getName());
+                    if (!zipEntryPath.normalize().startsWith(docsDirectory.normalize())) {
+                        throw new IOException("Bad zip entry");
+                    }
+                    Files.createDirectories(zipEntryPath);
 
                     zipInputStream.closeEntry();
                     continue;
                 }
 
                 var path = docsDirectory.resolve(entry.getName());
+
+                if (!path.normalize().startsWith(docsDirectory.normalize())) {
+                    throw new IOException("Bad zip entry");
+                }
                 var parent = path.getParent();
                 if (parent != null) {
                     Files.createDirectories(parent);
